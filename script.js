@@ -2,11 +2,11 @@ const { PDFDocument, PDFName, PDFString } = window.PDFLib || {};
 
 let pdfOriginalBytes = null; 
 let clicks = [];
-const labels = ["Campo 1 (X)", "Campo 2 (Base p/ Dado)", "Campo 3 (Texto do Dado)", "Resultado (=)"];
+const labels = ["C1 (Base)", "C2 (Nível/E2)", "C3 (Dado de Dano)", "C4 (Total)"];
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-// 1. CARREGAMENTO (Clone para evitar erro de ArrayBuffer)
+// 1. CARREGAMENTO
 document.getElementById('uploadPdf').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -28,7 +28,7 @@ document.getElementById('uploadPdf').addEventListener('change', async (e) => {
         document.getElementById('status').innerText = "Clique para: " + labels[0];
         document.getElementById('btnDownload').disabled = true;
     } catch (err) {
-        alert("Erro: " + err.message);
+        alert("Erro ao carregar PDF: " + err.message);
     }
 });
 
@@ -52,14 +52,14 @@ document.getElementById('pdf-canvas').addEventListener('click', (e) => {
     marker.innerText = labels[clicks.length - 1];
     document.body.appendChild(marker);
     if (clicks.length === 4) {
-        document.getElementById('btnDownload').disabled = false;
         document.getElementById('status').innerText = "Pronto!";
+        document.getElementById('btnDownload').disabled = false;
     } else {
         document.getElementById('status').innerText = "Clique para: " + labels[clicks.length];
     }
 });
 
-// 3. DOWNLOAD COM LÓGICA DE DADO E CÁLCULO
+// 3. DOWNLOAD COM LÓGICA DE ESCALONAMENTO
 document.getElementById('btnDownload').addEventListener('click', async () => {
     try {
         const pdfDoc = await PDFDocument.load(pdfOriginalBytes.slice(0));
@@ -81,8 +81,8 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             fields.push(f);
         }
 
-        // LÓGICA DO CAMPO 3 (Transforma o valor do Campo 2 em Texto de Dado)
-        const logicCampo3 = `
+        // --- LÓGICA DO CAMPO 3 (O DADO QUE MUDA SOZINHO) ---
+        const logicC3 = `
             var e2 = Number(this.getField("c2").value) || 0;
             var dado = "";
             if (e2 <= 5) dado = "1d4";
@@ -96,27 +96,28 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             event.value = dado;
         `;
 
-        // LÓGICA DO RESULTADO (Soma C1 * C2 + Valor numérico do dado no C3)
-        const logicResultado = `
+        // --- LÓGICA DO CAMPO 4 (RESULTADO TOTAL) ---
+        // Aqui limpamos o "1d" do campo 3 para somar apenas o número
+        const logicC4 = `
             var v1 = Number(this.getField("c1").value) || 0;
             var v2 = Number(this.getField("c2").value) || 0;
             var v3Raw = this.getField("c3").value;
-            // Extrai apenas o número do "1d20" -> vira 20
-            var v3Num = Number(v3Raw.replace("1d", "")) || 0; 
+            // Remove o "1d" e pega só o número (ex: "1d6" vira 6)
+            var v3Num = Number(v3Raw.replace("1d", "")) || 0;
             event.value = (v1 * v2) + v3Num;
         `;
 
-        // Injetar cálculo no Campo 3 (Texto do Dado)
+        // Injetando no Campo 3
         fields[2].acroField.dict.set(PDFName.of('AA'), docContext.obj({
-            C: docContext.obj({ Type: 'Action', S: 'JavaScript', JS: PDFString.of(logicCampo3) })
+            C: docContext.obj({ Type: 'Action', S: 'JavaScript', JS: PDFString.of(logicC3) })
         }));
 
-        // Injetar cálculo no Campo Resultado
+        // Injetando no Campo 4
         fields[3].acroField.dict.set(PDFName.of('AA'), docContext.obj({
-            C: docContext.obj({ Type: 'Action', S: 'JavaScript', JS: PDFString.of(logicResultado) })
+            C: docContext.obj({ Type: 'Action', S: 'JavaScript', JS: PDFString.of(logicC4) })
         }));
 
-        // Ordem de cálculo: C3 primeiro, depois o Resultado
+        // Configura Ordem de Cálculo (C3 primeiro, depois o Resultado C4)
         const acroForm = pdfDoc.catalog.get(PDFName.of('AcroForm'));
         if (acroForm) {
             const acroFormDict = docContext.lookup(acroForm);
@@ -128,9 +129,7 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
         const blob = new Blob([finalPdfBytes], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url;
-        a.download = "ficha_RPG_avancada.pdf";
-        a.click();
+        a.href = url; a.download = "ficha_T20_escalonada.pdf"; a.click();
         setTimeout(() => window.URL.revokeObjectURL(url), 1000);
 
     } catch (err) {
