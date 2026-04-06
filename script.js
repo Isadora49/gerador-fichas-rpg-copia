@@ -2,11 +2,11 @@ const { PDFDocument, PDFName, PDFString } = window.PDFLib || {};
 
 let pdfOriginalBytes = null; 
 let clicks = [];
-const labels = ["C1 (Base)", "C2 (Nível/E2)", "C3 (Dado de Dano)", "C4 (Total)"];
+const labels = ["C1 (Base)", "C2 (Nível)", "C3 (Dado)", "C4 (Total)"];
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-// 1. CARREGAMENTO
+// 1. CARREGAMENTO (Clone para evitar erro de ArrayBuffer)
 document.getElementById('uploadPdf').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -28,7 +28,7 @@ document.getElementById('uploadPdf').addEventListener('change', async (e) => {
         document.getElementById('status').innerText = "Clique para: " + labels[0];
         document.getElementById('btnDownload').disabled = true;
     } catch (err) {
-        alert("Erro ao carregar PDF: " + err.message);
+        alert("Erro ao carregar: " + err.message);
     }
 });
 
@@ -41,14 +41,10 @@ document.getElementById('pdf-canvas').addEventListener('click', (e) => {
     clicks.push({ x, y, w: rect.width, h: rect.height });
     const marker = document.createElement('div');
     marker.className = 'marker';
-    marker.style.left = e.pageX + 'px';
-    marker.style.top = e.pageY + 'px';
-    marker.style.position = 'absolute';
-    marker.style.background = '#e74c3c';
-    marker.style.color = 'white';
-    marker.style.padding = '4px';
-    marker.style.borderRadius = '4px';
-    marker.style.zIndex = "100";
+    marker.style.left = e.pageX + 'px'; marker.style.top = e.pageY + 'px';
+    marker.style.position = 'absolute'; marker.style.background = '#e74c3c';
+    marker.style.color = 'white'; marker.style.padding = '4px';
+    marker.style.borderRadius = '4px'; marker.style.zIndex = "100";
     marker.innerText = labels[clicks.length - 1];
     document.body.appendChild(marker);
     if (clicks.length === 4) {
@@ -59,7 +55,7 @@ document.getElementById('pdf-canvas').addEventListener('click', (e) => {
     }
 });
 
-// 3. DOWNLOAD COM LÓGICA DE ESCALONAMENTO
+// 3. DOWNLOAD COM LÓGICA DE ESCALONAMENTO E SOMA
 document.getElementById('btnDownload').addEventListener('click', async () => {
     try {
         const pdfDoc = await PDFDocument.load(pdfOriginalBytes.slice(0));
@@ -81,46 +77,46 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             fields.push(f);
         }
 
-        // --- LÓGICA DO CAMPO 3 (O DADO QUE MUDA SOZINHO) ---
+        // --- LÓGICA DO DADO (C3) ---
         const logicC3 = `
-            var e2 = Number(this.getField("c2").value) || 0;
-            var dado = "";
-            if (e2 <= 5) dado = "1d4";
-            else if (e2 <= 10) dado = "1d6";
-            else if (e2 <= 15) dado = "1d8";
-            else if (e2 <= 20) dado = "1d10";
-            else if (e2 <= 25) dado = "1d12";
-            else if (e2 <= 35) dado = "1d20";
-            else if (e2 <= 50) dado = "1d50";
-            else dado = "1d100";
-            event.value = dado;
+            var n2 = Number(this.getField("c2").value) || 0;
+            var d = "";
+            if (n2 <= 5) d = "1d4";
+            else if (n2 <= 10) d = "1d6";
+            else if (n2 <= 15) d = "1d8";
+            else if (n2 <= 20) d = "1d10";
+            else if (n2 <= 25) d = "1d12";
+            else if (n2 <= 35) d = "1d20";
+            else if (n2 <= 50) d = "1d50";
+            else d = "1d100";
+            this.getField("c3").value = d;
         `;
 
-        // --- LÓGICA DO CAMPO 4 (RESULTADO TOTAL) ---
-        // Aqui limpamos o "1d" do campo 3 para somar apenas o número
+        // --- LÓGICA DO TOTAL (C4) ---
         const logicC4 = `
             var v1 = Number(this.getField("c1").value) || 0;
             var v2 = Number(this.getField("c2").value) || 0;
             var v3Raw = this.getField("c3").value;
-            // Remove o "1d" e pega só o número (ex: "1d6" vira 6)
             var v3Num = Number(v3Raw.replace("1d", "")) || 0;
             event.value = (v1 * v2) + v3Num;
         `;
 
-        // Injetando no Campo 3
-        fields[2].acroField.dict.set(PDFName.of('AA'), docContext.obj({
-            C: docContext.obj({ Type: 'Action', S: 'JavaScript', JS: PDFString.of(logicC3) })
+        // Injetamos a lógica de mudança de dado no campo C2 (quando ele muda, altera o C3)
+        fields[1].acroField.dict.set(PDFName.of('AA'), docContext.obj({
+            F: docContext.obj({ Type: 'Action', S: 'JavaScript', JS: PDFString.of(logicC3) }), // OnFocus/Format
+            K: docContext.obj({ Type: 'Action', S: 'JavaScript', JS: PDFString.of(logicC3) })  // OnKeystroke
         }));
 
-        // Injetando no Campo 4
+        // Injetamos a soma no Campo de Resultado (C4)
         fields[3].acroField.dict.set(PDFName.of('AA'), docContext.obj({
             C: docContext.obj({ Type: 'Action', S: 'JavaScript', JS: PDFString.of(logicC4) })
         }));
 
-        // Configura Ordem de Cálculo (C3 primeiro, depois o Resultado C4)
+        // ORDEM DE CÁLCULO: Primeiro atualiza o texto do dado, depois soma
         const acroForm = pdfDoc.catalog.get(PDFName.of('AcroForm'));
         if (acroForm) {
             const acroFormDict = docContext.lookup(acroForm);
+            // C3 deve ser processado antes de RES
             acroFormDict.set(PDFName.of('CO'), docContext.obj([fields[2].ref, fields[3].ref]));
             acroFormDict.set(PDFName.of('NeedAppearances'), docContext.obj(true));
         }
@@ -129,7 +125,7 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
         const blob = new Blob([finalPdfBytes], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url; a.download = "ficha_T20_escalonada.pdf"; a.click();
+        a.href = url; a.download = "ficha_T20_v3.pdf"; a.click();
         setTimeout(() => window.URL.revokeObjectURL(url), 1000);
 
     } catch (err) {
