@@ -87,15 +87,15 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
         // Evita qualquer problema de leitura no Adobe/Chrome/Edge
         
         const logicC3 = [
-            'var e2 = Number(this.getField("c2").value) || 0;',
+            'var c2 = Number(this.getField("c2").value) || 0;',
             'var d = "1d4";',
             'if (e2 > 50) d = "1d100";',
-            'else if (e2 > 35) d = "1d50";',
-            'else if (e2 > 25) d = "1d20";',
-            'else if (e2 > 20) d = "1d12";',
-            'else if (e2 > 15) d = "1d10";',
-            'else if (e2 > 10) d = "1d8";',
-            'else if (e2 > 5) d = "1d6";',
+            'else if (c2 > 35) d = "1d50";',
+            'else if (c2 > 25) d = "1d20";',
+            'else if (c2 > 20) d = "1d12";',
+            'else if (c2 > 15) d = "1d10";',
+            'else if (c2 > 10) d = "1d8";',
+            'else if (c2 > 5) d = "1d6";',
             'event.value = d;'
         ].join(' ');
 
@@ -105,7 +105,7 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             'var f3 = this.getField("c3").value;',
             'var str3 = f3 ? f3.toString() : "";',
             'var num3 = 0;',
-            'if (str3.indexOf("d") > -1) { num3 = Number(str3.split("d")[1]) || 0; }',
+            'if (str3.indexOf("1d") > -1) { num3 = Number(str3.split("1d")[1]) || 0; }',
             'else { num3 = Number(str3) || 0; }',
             'event.value = (n1 * n2) + num3;'
         ].join(' ');
