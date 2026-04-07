@@ -100,11 +100,11 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
         const logicC4 = `
             var n1 = Number(this.getField("c1").value) || 0;
             var n2 = Number(this.getField("c2").value) || 0;
-            var v3 = this.getField("c3").valueAsString || this.getField("c3").value || "";
+            var v4 = this.getField("c3").valueAsString || this.getField("c3").value || "";
             var n3 = 0;
-            if (v3) {
-                var cleanV3 = v3.replace("1d", "");
-                n3 = Number(cleanV3) || 0;
+            if (v4) {
+                var cleanV4 = v4.replace("1d", "");
+                n3 = Number(cleanV4) || 0;
             }
             event.value = (n1 * n2) + n3;
         `;
@@ -132,7 +132,7 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = "ficha_T20_corrigida_v3.pdf";
+        a.download = "ficha_T20_corrigida_v4.pdf";
         document.body.appendChild(a);
         a.click();
         
