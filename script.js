@@ -2,7 +2,7 @@ const { PDFDocument, PDFName, PDFString } = window.PDFLib || {};
 
 let pdfOriginalBytes = null; 
 let clicks = [];
-// Adicionados rótulos até o C8
+// Adicionei os rótulos extras até o C8
 const labels = [
     "C1 (Lista A/B/C)", "C2 (Nível)", "C3 (Dado)", "C4 (Total)", 
     "C5 (Extra)", "C6 (Extra)", "C7 (Extra)", "C8 (Extra)"
@@ -10,7 +10,7 @@ const labels = [
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-// 1. CARREGAMENTO
+// 1. CARREGAMENTO (Clone de ArrayBuffer para evitar erro de download)
 document.getElementById('uploadPdf').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -36,13 +36,16 @@ document.getElementById('uploadPdf').addEventListener('change', async (e) => {
     }
 });
 
-// 2. MARCAÇÃO (Agora até 8)
+// 2. MARCAÇÃO
 document.getElementById('pdf-canvas').addEventListener('click', (e) => {
-    if (clicks.length >= 8 || !pdfOriginalBytes) return; // Limite alterado para 8
+    // Aumentado o limite de cliques de 4 para 8
+    if (clicks.length >= 8 || !pdfOriginalBytes) return;
+    
     const rect = e.target.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     clicks.push({ x, y, w: rect.width, h: rect.height });
+    
     const marker = document.createElement('div');
     marker.className = 'marker';
     marker.style.left = e.pageX + 'px';
@@ -56,7 +59,8 @@ document.getElementById('pdf-canvas').addEventListener('click', (e) => {
     marker.innerText = labels[clicks.length - 1];
     document.body.appendChild(marker);
     
-    if (clicks.length === 8) { // Checagem alterada para 8
+    // A checagem de "Pronto!" agora espera os 8 cliques
+    if (clicks.length === 8) {
         document.getElementById('status').innerText = "Pronto!";
         document.getElementById('btnDownload').disabled = false;
     } else {
@@ -73,18 +77,22 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
         const { width, height } = page.getSize();
         const docContext = pdfDoc.context;
 
-        // Nomes dos 8 campos
+        // Adicionados os campos c5, c6, c7 e c8 na lista
         const fieldNames = ['c1', 'c2', 'c3', 'res', 'c5', 'c6', 'c7', 'c8'];
         const fields = [];
 
-        for (let i = 0; i < 8; i++) { // Loop alterado para 8
+        // O laço agora vai criar 8 campos
+        for (let i = 0; i < 8; i++) {
             let f;
+            // SE FOR O CAMPO 1 (i === 0), CRIA UMA CAIXA DE LISTA
             if (i === 0) {
                 f = form.createDropdown(fieldNames[i]);
-                f.addOptions(['A', 'B', 'C']); 
-                f.select('A'); 
+                f.addOptions(['A', 'B', 'C']); // Adiciona as opções
+                f.select('A'); // Define 'A' como padrão
             } else {
+                // SE FOREM OS OUTROS CAMPOS, CRIA CAMPO DE TEXTO NORMAL
                 f = form.createTextField(fieldNames[i]);
+                // Apenas o C3 (i === 2) recebe "1d4" inicial. Os outros recebem "0".
                 f.setText(i === 2 ? "1d4" : "0");
             }
 
@@ -95,7 +103,7 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             fields.push(f);
         }
 
-        // SCRIPT UNIFICADO
+        // SCRIPT UNIFICADO: Lógica da Letra -> Número mantida intocável
         const scriptMotor = [
             'var escolha = this.getField("c1").value;',
             'var c1 = 0;',
@@ -107,6 +115,7 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             'var dText = "";',
             'var dNum = 0;',
 
+            // ORDEM IMPORTA (do maior para o menor)
             'if (c2 >= 51) { dText = "1d100"; dNum = 100; }',
             'else if (c2 >= 27 && c2 <= 50) { dText = "1d50"; dNum = 50; }',
             'else if (c2 >= 26 && c2 <= 35) { dText = "1d20"; dNum = 20; }', 
@@ -116,8 +125,10 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             'else if (c2 >= 6 && c2 <= 10) { dText = "1d6"; dNum = 6; }',
             'else { dText = "1d4"; dNum = 4; }',
 
+            // Atualiza campo 3
             'this.getField("c3").value = dText;',
 
+            // Calcula resultado
             'this.getField("res").value = (c1 * c2) + dNum;'
         ].join('\n');
 
@@ -127,9 +138,11 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             JS: PDFString.of(scriptMotor)
         });
 
+        // Adicionando os gatilhos no C1 e C2 para fazer a matemática funcionar
         fields[0].acroField.dict.set(PDFName.of('AA'), docContext.obj({ K: action, V: action })); 
         fields[1].acroField.dict.set(PDFName.of('AA'), docContext.obj({ K: action })); 
 
+        // Configuração final do PDF
         const acroForm = pdfDoc.catalog.get(PDFName.of('AcroForm'));
         if (acroForm) {
             const acroFormDict = docContext.lookup(acroForm);
@@ -141,7 +154,7 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = "ficha_RPG_calculavel_8campos.pdf";
+        a.download = "ficha_RPG_calculavel_8_campos.pdf";
         a.click();
         setTimeout(() => window.URL.revokeObjectURL(url), 1500);
 
