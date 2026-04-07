@@ -77,8 +77,8 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             // SE FOR O CAMPO 1 (i === 0), CRIA UMA CAIXA DE LISTA
             if (i === 0) {
                 f = form.createDropdown(fieldNames[i]);
-                f.addOptions(['A', 'B', 'C']); // Adiciona as opções
-                f.select('A'); // Define 'A' como padrão
+                f.addOptions(['Classes', 'Tank', 'Destridor']); // Adiciona as opções
+                f.select('Classes'); // Define 'A' como padrão
             } else {
                 // SE FOREM OS OUTROS CAMPOS, CRIA CAMPO DE TEXTO NORMAL
                 f = form.createTextField(fieldNames[i]);
@@ -96,9 +96,9 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
         const scriptMotor = [
             'var escolha = this.getField("c1").value;',
             'var c1 = 0;',
-            'if (escolha == "A") { c1 = 8; }',
-            'else if (escolha == "B") { c1 = 2; }',
-            'else if (escolha == "C") { c1 = 2; }',
+            'if (escolha == "Classe") { c1 = 0; }',
+            'else if (escolha == "Tank") { c1 = 8; }',
+            'else if (escolha == "Destridor") { c1 = 2; }',
             
             'var c2 = Number(this.getField("c2").value) || 0;',
             'var dText = "";',
