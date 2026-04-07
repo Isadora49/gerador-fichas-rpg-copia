@@ -42,10 +42,14 @@ document.getElementById('pdf-canvas').addEventListener('click', (e) => {
     clicks.push({ x, y, w: rect.width, h: rect.height });
     const marker = document.createElement('div');
     marker.className = 'marker';
-    marker.style.left = e.pageX + 'px'; marker.style.top = e.pageY + 'px';
-    marker.style.position = 'absolute'; marker.style.background = '#e74c3c';
-    marker.style.color = 'white'; marker.style.padding = '4px';
-    marker.style.borderRadius = '4px'; marker.style.zIndex = "100";
+    marker.style.left = e.pageX + 'px';
+    marker.style.top = e.pageY + 'px';
+    marker.style.position = 'absolute';
+    marker.style.background = '#e74c3c';
+    marker.style.color = 'white';
+    marker.style.padding = '4px';
+    marker.style.borderRadius = '4px';
+    marker.style.zIndex = "100";
     marker.innerText = labels[clicks.length - 1];
     document.body.appendChild(marker);
     if (clicks.length === 4) {
