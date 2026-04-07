@@ -82,7 +82,6 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
                 f.select('A');
             } else {
                 f = form.createTextField(fieldNames[i]);
-                // Inicializa C3 e C6 com "1d4"
                 f.setText((i === 2 || i === 5) ? "1d4" : "0");
             }
             const pos = clicks[i];
@@ -92,12 +91,17 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             fields.push(f);
         }
 
-        // MOTOR DE CÁLCULO DUPLO
+        // MOTOR DE CÁLCULO ATUALIZADO COM VALORES DUPLOS
         const scriptMotor = [
             'var escolha = this.getField("c1").value;',
-            'var valBase = (escolha == "A") ? 8 : 2;',
+            'var valBase1 = 0; var valBase2 = 0;',
             
-            // --- BLOCO 1 (C2 influencia C3 e gera C4/res) ---
+            // Definição das duplas de valores
+            'if (escolha == "A") { valBase1 = 8; valBase2 = 2; }',
+            'else if (escolha == "B") { valBase1 = 2; valBase2 = 4; }',
+            'else if (escolha == "C") { valBase1 = 2; valBase2 = 6; }',
+            
+            // --- BLOCO 1 (Usa valBase1) ---
             'var n1 = Number(this.getField("c2").value) || 0;',
             'var d1T = "1d4"; var d1N = 4;',
             'if (n1 >= 51) { d1T = "1d100"; d1N = 100; }',
@@ -108,9 +112,9 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             'else if (n1 >= 11) { d1T = "1d8"; d1N = 8; }',
             'else if (n1 >= 6) { d1T = "1d6"; d1N = 6; }',
             'this.getField("c3").value = d1T;',
-            'this.getField("res").value = (valBase * n1) + d1N;',
+            'this.getField("res").value = (valBase1 * n1) + d1N;',
 
-            // --- BLOCO 2 (C5 influencia C6 e gera C7/res2) ---
+            // --- BLOCO 2 (Usa valBase2) ---
             'var n2 = Number(this.getField("c5").value) || 0;',
             'var d2T = "1d4"; var d2N = 4;',
             'if (n2 >= 51) { d2T = "1d100"; d2N = 100; }',
@@ -121,7 +125,7 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             'else if (n2 >= 11) { d2T = "1d8"; d2N = 8; }',
             'else if (n2 >= 6) { d2T = "1d6"; d2N = 6; }',
             'this.getField("c6").value = d2T;',
-            'this.getField("res2").value = (valBase * n2) + d2N;'
+            'this.getField("res2").value = (valBase2 * n2) + d2N;'
         ].join('\n');
 
         const action = docContext.obj({
@@ -130,7 +134,6 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             JS: PDFString.of(scriptMotor)
         });
 
-        // Gatilhos: O cálculo roda se mudar C1 (lista), C2 (nível 1) ou C5 (nível 2)
         fields[0].acroField.dict.set(PDFName.of('AA'), docContext.obj({ K: action, V: action })); 
         fields[1].acroField.dict.set(PDFName.of('AA'), docContext.obj({ K: action })); 
         fields[4].acroField.dict.set(PDFName.of('AA'), docContext.obj({ K: action })); 
@@ -146,7 +149,7 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = "ficha_RPG_dupla_logica.pdf";
+        a.download = "ficha_RPG_multi_valores.pdf";
         a.click();
     } catch (err) {
         alert("Erro técnico: " + err.message);
