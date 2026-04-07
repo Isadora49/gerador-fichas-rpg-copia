@@ -3,7 +3,7 @@ const { PDFDocument, PDFName, PDFString } = window.PDFLib || {};
 let pdfOriginalBytes = null; 
 let clicks = [];
 
-// 1. RÓTULOS EXPANDIDOS (Total 40)
+// 1. RÓTULOS EXPANDIDOS (Total 40 - 36 lógicos + 4 textos livres)
 const labels = [
     "C1 (Lista Base)", "C2 (Nível 1)", "C3 (Dado 1)", "C4 (Total 1)", 
     "C5 (Nível 2)", "C6 (Dado 2)", "C7 (Total 2)", "C8 (Total 3)",
@@ -14,7 +14,7 @@ const labels = [
     "C25 (Nível 11)", "C26 (Dado 11)", "C27 (Nível 12)", "C28 (Dado 12)",
     "C29 (Nível 13)", "C30 (Dado 13)", "C31 (Nível 14)", "C32 (Dado 14)",
     "C33 (Nível 15)", "C34 (Dado 15)", "C35 (Nível 16)", "C36 (Dado 16)",
-    "C37 (Nível 17)", "C38 (Dado 17)", "C39 (Nível 18)", "C40 (Dado 18)"
+    "C37 (Texto Livre 1)", "C38 (Texto Livre 2)", "C39 (Texto Livre 3)", "C40 (Texto Livre 4)"
 ];
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
@@ -100,9 +100,15 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
                 f.select('A');
             } else {
                 f = form.createTextField(fieldNames[i]);
-                // Índices que são campos de "Dado" (C3, C6, C10... C38, C40)
-                const dadosIndices = [2, 5, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39];
-                f.setText(dadosIndices.includes(i) ? "1d4" : "0");
+                
+                // Índices lógicos (até C36)
+                if (i < 36) {
+                    const dadosIndices = [2, 5, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35];
+                    f.setText(dadosIndices.includes(i) ? "1d4" : "0");
+                } else {
+                    // Campos 37, 38, 39 e 40 (Texto Livre) ficam vazios por padrão
+                    f.setText(""); 
+                }
             }
             const pos = clicks[i];
             const pdfX = (pos.x * width) / pos.w;
@@ -111,7 +117,7 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             fields.push(f);
         }
 
-        // MOTOR DE CÁLCULO ATUALIZADO (Total 40)
+        // MOTOR DE CÁLCULO MANTIDO INTACTO (Lógica até C36 apenas)
         const scriptMotor = [
             'var escolha = this.getField("c1").value;',
             'var valBase1 = 0; var valBase2 = 0; var valBase3 = 0;',
@@ -143,7 +149,7 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             'var d2N = (n2 >= 51)?100:(n2 >= 27)?50:(n2 >= 26)?20:(n2 >= 21)?12:(n2 >= 16)?10:(n2 >= 11)?8:(n2 >= 6)?6:4;',
             'this.getField("res2").value = (valBase2 * n2) + d2N;',
 
-            // Automação de Dados (9 ao 40)
+            // Automação de Dados (9 ao 36)
             'this.getField("c10").value = getDado(this.getField("c9").value);',
             'this.getField("c12").value = getDado(this.getField("c11").value);',
             'this.getField("c14").value = getDado(this.getField("c13").value);',
@@ -157,9 +163,7 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             'this.getField("c30").value = getDado(this.getField("c29").value);',
             'this.getField("c32").value = getDado(this.getField("c31").value);',
             'this.getField("c34").value = getDado(this.getField("c33").value);',
-            'this.getField("c36").value = getDado(this.getField("c35").value);',
-            'this.getField("c38").value = getDado(this.getField("c37").value);',
-            'this.getField("c40").value = getDado(this.getField("c39").value);'
+            'this.getField("c36").value = getDado(this.getField("c35").value);'
         ].join('\n');
 
         const action = docContext.obj({
@@ -168,8 +172,8 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             JS: PDFString.of(scriptMotor)
         });
 
-        // GATILHOS (Índices dos campos de Nível que disparam o script)
-        const triggerIndices = [0, 1, 4, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38]; 
+        // GATILHOS (Índices apenas dos campos lógicos)
+        const triggerIndices = [0, 1, 4, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34]; 
         triggerIndices.forEach(idx => {
             fields[idx].acroField.dict.set(PDFName.of('AA'), docContext.obj({ K: action, V: action }));
         });
