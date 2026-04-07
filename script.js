@@ -134,7 +134,7 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = "ficha_rpg_calculavel.pdf";
+        a.download = "ficha_rpg_calculavel_copia.pdf";
         document.body.appendChild(a);
         a.click();
         
