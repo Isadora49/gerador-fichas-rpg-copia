@@ -2,11 +2,11 @@ const { PDFDocument, PDFName, PDFString } = window.PDFLib || {};
 
 let pdfOriginalBytes = null; 
 let clicks = [];
-const labels = ["C1 (Base)", "C2 (Nível/E2)", "C3 (Exibir Dado)", "C4 (Resultado Total)"];
+const labels = ["C1 (Base)", "C2 (E2/Nível)", "C3 (Dado)", "C4 (Resultado)"];
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-// 1. CARREGAMENTO SEGURO
+// 1. CARREGAMENTO
 document.getElementById('uploadPdf').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -52,14 +52,14 @@ document.getElementById('pdf-canvas').addEventListener('click', (e) => {
     marker.innerText = labels[clicks.length - 1];
     document.body.appendChild(marker);
     if (clicks.length === 4) {
-        document.getElementById('status').innerText = "Pronto para baixar!";
+        document.getElementById('status').innerText = "Pronto!";
         document.getElementById('btnDownload').disabled = false;
     } else {
         document.getElementById('status').innerText = "Clique para: " + labels[clicks.length];
     }
 });
 
-// 3. GERAÇÃO DO PDF COM LÓGICA DE NAVEGADOR
+// 3. O SCRIPT DE CÁLCULO MESTRE
 document.getElementById('btnDownload').addEventListener('click', async () => {
     try {
         const pdfDoc = await PDFDocument.load(pdfOriginalBytes.slice(0));
@@ -81,61 +81,20 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             fields.push(f);
         }
 
-        // LÓGICA PARA O CAMPO 3 (APENAS EXIBIÇÃO DO TEXTO)
-        const logicC3 = `
-            var e2 = Number(this.getField("c2").value) || 0;
-            var d = "1d4";
-            if (e2 > 50) d = "1d100";
-            else if (e2 > 35) d = "1d50";
-            else if (e2 > 25) d = "1d20";
-            else if (e2 > 20) d = "1d12";
-            else if (e2 > 15) d = "1d10";
-            else if (e2 > 10) d = "1d8";
-            else if (e2 > 5) d = "1d6";
-            event.value = d;
-        `;
-
-        // LÓGICA PARA O CAMPO 4 (CALCULA O DADO INTERNAMENTE PARA NÃO ERRAR)
-        const logicC4 = `
+        // LÓGICA UNIFICADA: C3 e C4 calculados juntos para evitar conflitos de ordem
+        const masterScript = `
             var n1 = Number(this.getField("c1").value) || 0;
-            var n2 = Number(this.getField("c2").value) || 0;
-            var dVal = 4;
-            if (n2 > 50) dVal = 100;
-            else if (n2 > 35) dVal = 50;
-            else if (n2 > 25) dVal = 20;
-            else if (n2 > 20) dVal = 12;
-            else if (n2 > 15) dVal = 10;
-            else if (n2 > 10) dVal = 8;
-            else if (n2 > 5) dVal = 6;
-            event.value = (n1 * n2) + dVal;
-        `;
+            var e2 = Number(this.getField("c2").value) || 0;
+            var c3 = this.getField("c3");
+            var res = this.getField("res");
 
-        // Injetar Ações de Cálculo
-        fields[2].acroField.dict.set(PDFName.of('AA'), docContext.obj({
-            C: docContext.obj({ Type: 'Action', S: 'JavaScript', JS: PDFString.of(logicC3) })
-        }));
+            // Define o texto do dado no Campo 3 baseado no E2 (Campo 2)
+            var dadoTexto = "1d4";
+            var dadoValor = 4;
 
-        fields[3].acroField.dict.set(PDFName.of('AA'), docContext.obj({
-            C: docContext.obj({ Type: 'Action', S: 'JavaScript', JS: PDFString.of(logicC4) })
-        }));
-
-        // CONFIGURAÇÃO CRUCIAL DO FORMULÁRIO PARA CHROME
-        const acroForm = pdfDoc.catalog.get(PDFName.of('AcroForm'));
-        if (acroForm) {
-            const acroFormDict = docContext.lookup(acroForm);
-            // Define a ordem: Primeiro C3 atualiza o texto, depois C4 faz a conta.
-            acroFormDict.set(PDFName.of('CO'), docContext.obj([fields[2].ref, fields[3].ref]));
-            acroFormDict.set(PDFName.of('NeedAppearances'), docContext.obj(true));
-        }
-
-        const finalPdfBytes = await pdfDoc.save();
-        const blob = new Blob([finalPdfBytes], { type: 'application/pdf' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = "ficha_T20_total_compativel.pdf"; a.click();
-        setTimeout(() => window.URL.revokeObjectURL(url), 1000);
-
-    } catch (err) {
-        alert("Erro crítico: " + err.message);
-    }
-});
+            if (e2 >= 51) { dadoTexto = "1d100"; dadoValor = 100; }
+            else if (e2 <= 50 && e2 > 35) { dadoTexto = "1d50"; dadoValor = 50; }
+            else if (e2 <= 35 && e2 > 25) { dadoTexto = "1d20"; dadoValor = 20; }
+            else if (e2 <= 25 && e2 > 20) { dadoTexto = "1d12"; dadoValor = 12; }
+            else if (e2 <= 20 && e2 > 15) { dadoTexto = "1d10"; dadoValor = 10; }
+            else if (e2 <= 15 && e2 > 10) { dadoTexto = "1d8"; dadoValor =
