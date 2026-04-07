@@ -7,6 +7,8 @@ const labels = [
     "C5 (Nível 2)", "C6 (Dado 2)", "C7 (Total 2)", "C8 (Total 3)",
     "C9 (Nível 3)", "C10 (Dado 3)", "C11 (Nível 4)", "C12 (Dado 4)",
     "C13 (Nível 5)", "C14 (Dado 5)", "C15 (Nível 6)", "C16 (Dado 6)"
+    "C17 (Nível 7)", "C18 (Dado 7)", "C19 (Nível 8)", "C20 (Dado 8)"
+
 ];
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
@@ -56,7 +58,7 @@ document.getElementById('pdf-canvas').addEventListener('click', (e) => {
     marker.style.zIndex = "100";
     marker.innerText = labels[clicks.length - 1];
     document.body.appendChild(marker);
-    if (clicks.length === 16) {
+    if (clicks.length === 20) {
         document.getElementById('status').innerText = "Pronto!";
         document.getElementById('btnDownload').disabled = false;
     } else {
@@ -75,11 +77,11 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
 
         const fieldNames = [
             'c1', 'c2', 'c3', 'res', 'c5', 'c6', 'res2', 'c8',
-            'c9', 'c10', 'c11', 'c12', 'c13', 'c14', 'c15', 'c16'
+            'c9', 'c10', 'c11', 'c12', 'c13', 'c14', 'c15', 'c16', 'c17','18','19','20',
         ];
         const fields = [];
 
-        for (let i = 0; i < 16; i++) {
+        for (let i = 0; i < 20; i++) {
             let f;
             if (i === 0) {
                 f = form.createDropdown(fieldNames[i]);
@@ -88,7 +90,7 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             } else {
                 f = form.createTextField(fieldNames[i]);
                 // Inicializa os campos de "Dado" com 1d4
-                const dadosIndices = [2, 5, 9, 11, 13, 15]; // Índices visuais (c3, c6, c10, c12, c14, c16)
+                const dadosIndices = [2, 5, 9, 11, 13, 15,17,19]; // Índices visuais (c3, c6, c10, c12, c14, c16)
                 f.setText(dadosIndices.includes(i) ? "1d4" : "0");
             }
             const pos = clicks[i];
@@ -130,11 +132,13 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             'var d2N = (n2 >= 51)?100:(n2 >= 27)?50:(n2 >= 26)?20:(n2 >= 21)?12:(n2 >= 16)?10:(n2 >= 11)?8:(n2 >= 6)?6:4;',
             'this.getField("res2").value = (valBase2 * n2) + d2N;',
 
-            // NOVAS LÓGICAS (Campos 9 até 16)
+            // NOVAS LÓGICAS (Campos 9 até 19)
             'this.getField("c10").value = getDado(Number(this.getField("c9").value) || 0);',
             'this.getField("c12").value = getDado(Number(this.getField("c11").value) || 0);',
             'this.getField("c14").value = getDado(Number(this.getField("c13").value) || 0);',
-            'this.getField("c16").value = getDado(Number(this.getField("c15").value) || 0);'
+            'this.getField("c16").value = getDado(Number(this.getField("c15").value) || 0);',
+            'this.getField("c18").value = getDado(Number(this.getField("c17").value) || 0);',
+            'this.getField("c19").value = getDado(Number(this.getField("c20").value) || 0);'
         ].join('\n');
 
         const action = docContext.obj({
@@ -144,7 +148,7 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
         });
 
         // Adicionando Gatilhos para todos os campos que influenciam outros
-        const triggerIndices = [0, 1, 4, 8, 10, 12, 14]; 
+        const triggerIndices = [0, 1, 4, 8, 10, 12, 14, 16, 18, 20 ]; 
         triggerIndices.forEach(idx => {
             fields[idx].acroField.dict.set(PDFName.of('AA'), docContext.obj({ K: action, V: action }));
         });
