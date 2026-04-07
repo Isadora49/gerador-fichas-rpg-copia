@@ -4,7 +4,7 @@ let pdfOriginalBytes = null;
 let clicks = [];
 const labels = [
     "C1 (Lista Base)", "C2 (Nível 1)", "C3 (Dado 1)", "C4 (Total 1)", 
-    "C5 (Nível 2)", "C6 (Dado 2)", "C7 (Total 2)", "C8 (Extra)"
+    "C5 (Nível 2)", "C6 (Dado 2)", "C7 (Total 2)", "C8 (Total 3)"
 ];
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
@@ -91,17 +91,17 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             fields.push(f);
         }
 
-        // MOTOR DE CÁLCULO ATUALIZADO COM VALORES DUPLOS
+        // MOTOR DE CÁLCULO TRIPLO
         const scriptMotor = [
             'var escolha = this.getField("c1").value;',
-            'var valBase1 = 0; var valBase2 = 0;',
+            'var valBase1 = 0; var valBase2 = 0; var valBase3 = 0;',
             
-            // Definição das duplas de valores
-            'if (escolha == "A") { valBase1 = 8; valBase2 = 2; }',
-            'else if (escolha == "B") { valBase1 = 2; valBase2 = 4; }',
-            'else if (escolha == "C") { valBase1 = 2; valBase2 = 6; }',
+            // Definição da trinca de valores com base na escolha
+            'if (escolha == "A") { valBase1 = 8; valBase2 = 2; valBase3 = 2; }',
+            'else if (escolha == "B") { valBase1 = 2; valBase2 = 4; valBase3 = 2; }',
+            'else if (escolha == "C") { valBase1 = 4; valBase2 = 4; valBase3 = 2; }', // Ajustado para 4, 4, 2 conforme seu exemplo
             
-            // --- BLOCO 1 (Usa valBase1) ---
+            // --- BLOCO 1 (C2 influencia C3, gera C4/res e C8) ---
             'var n1 = Number(this.getField("c2").value) || 0;',
             'var d1T = "1d4"; var d1N = 4;',
             'if (n1 >= 51) { d1T = "1d100"; d1N = 100; }',
@@ -112,9 +112,14 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             'else if (n1 >= 11) { d1T = "1d8"; d1N = 8; }',
             'else if (n1 >= 6) { d1T = "1d6"; d1N = 6; }',
             'this.getField("c3").value = d1T;',
+            
+            // Cálculo do Campo 4 (Total 1)
             'this.getField("res").value = (valBase1 * n1) + d1N;',
+            
+            // NOVO: Cálculo do Campo 8 usando a base 3, o campo 2 (n1) e o campo 3 (d1N)
+            'this.getField("c8").value = (valBase3 * n1) + d1N;',
 
-            // --- BLOCO 2 (Usa valBase2) ---
+            // --- BLOCO 2 (C5 influencia C6 e gera C7/res2) ---
             'var n2 = Number(this.getField("c5").value) || 0;',
             'var d2T = "1d4"; var d2N = 4;',
             'if (n2 >= 51) { d2T = "1d100"; d2N = 100; }',
@@ -134,6 +139,8 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             JS: PDFString.of(scriptMotor)
         });
 
+        // Os gatilhos continuam os mesmos, já que c8 depende de C1 e C2, 
+        // e ambos já possuem o evento atrelado a eles.
         fields[0].acroField.dict.set(PDFName.of('AA'), docContext.obj({ K: action, V: action })); 
         fields[1].acroField.dict.set(PDFName.of('AA'), docContext.obj({ K: action })); 
         fields[4].acroField.dict.set(PDFName.of('AA'), docContext.obj({ K: action })); 
@@ -149,7 +156,7 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = "ficha_RPG_multi_valores.pdf";
+        a.download = "ficha_RPG_tripla_logica.pdf";
         a.click();
     } catch (err) {
         alert("Erro técnico: " + err.message);
