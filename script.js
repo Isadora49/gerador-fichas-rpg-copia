@@ -2,11 +2,12 @@ const { PDFDocument, PDFName, PDFString } = window.PDFLib || {};
 
 let pdfOriginalBytes = null; 
 let clicks = [];
-const labels = ["C1 (Base)", "C2 (Nível)", "C3 (Dado de Dano)", "C4 (Total)"];
+// Mudei o rótulo para você saber que é uma lista
+const labels = ["C1 (Lista A/B/C)", "C2 (Nível)", "C3 (Dado)", "C4 (Total)"];
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-// 1. CARREGAMENTO BLINDADO
+// 1. CARREGAMENTO (Clone de ArrayBuffer para evitar erro de download)
 document.getElementById('uploadPdf').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -28,7 +29,7 @@ document.getElementById('uploadPdf').addEventListener('change', async (e) => {
         document.getElementById('status').innerText = "Clique para: " + labels[0];
         document.getElementById('btnDownload').disabled = true;
     } catch (err) {
-        alert("Erro ao carregar PDF: " + err.message);
+        alert("Erro no PDF: " + err.message);
     }
 });
 
@@ -59,7 +60,7 @@ document.getElementById('pdf-canvas').addEventListener('click', (e) => {
     }
 });
 
-// 3. DOWNLOAD E CÁLCULO DEFINITIVO
+// 3. LOGICA E DOWNLOAD
 document.getElementById('btnDownload').addEventListener('click', async () => {
     try {
         const pdfDoc = await PDFDocument.load(pdfOriginalBytes.slice(0));
@@ -72,59 +73,68 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
         const fields = [];
 
         for (let i = 0; i < 4; i++) {
-            const f = form.createTextField(fieldNames[i]);
+            let f;
+            // SE FOR O CAMPO 1 (i === 0), CRIA UMA CAIXA DE LISTA
+            if (i === 0) {
+                f = form.createDropdown(fieldNames[i]);
+                f.addOptions(['A', 'B', 'C']); // Adiciona as opções
+                f.select('A'); // Define 'A' como padrão
+            } else {
+                // SE FOREM OS OUTROS CAMPOS, CRIA CAMPO DE TEXTO NORMAL
+                f = form.createTextField(fieldNames[i]);
+                f.setText(i === 2 ? "1d4" : "0");
+            }
+
             const pos = clicks[i];
             const pdfX = (pos.x * width) / pos.w;
             const pdfY = height - ((pos.y * height) / pos.h);
             f.addToPage(page, { x: pdfX, y: pdfY - 10, width: 60, height: 20 });
-            
-            // Inicia o campo 3 já com "1d4" e os outros com "0"
-            if (i === 2) { f.setText("1d4"); } else { f.setText("0"); }
             fields.push(f);
         }
 
-        // --- O SEGREDO: SCRIPT EM LINHA ÚNICA ---
-        // Evita qualquer problema de leitura no Adobe/Chrome/Edge
-        
-        const logicC3 = [
+        // SCRIPT UNIFICADO: Lógica da Letra -> Número inclusa
+        const scriptMotor = [
+            'var escolha = this.getField("c1").value;',
+            'var c1 = 0;',
+            'if (escolha == "A") { c1 = 8; }',
+            'else if (escolha == "B") { c1 = 2; }',
+            'else if (escolha == "C") { c1 = 2; }',
+            
             'var c2 = Number(this.getField("c2").value) || 0;',
-            'var d = "1d4";',
-            'if (e2 > 50) d = "1d100";',
-            'else if (c2 > 35) d = "1d50";',
-            'else if (c2 > 25) d = "1d20";',
-            'else if (c2 > 20) d = "1d12";',
-            'else if (c2 > 15) d = "1d10";',
-            'else if (c2 > 10) d = "1d8";',
-            'else if (c2 > 5) d = "1d6";',
-            'event.value = d;'
-        ].join(' ');
+            'var dText = "";',
+            'var dNum = 0;',
 
-        const logicC4 = [
-            'var n1 = Number(this.getField("c1").value) || 0;',
-            'var n2 = Number(this.getField("c2").value) || 0;',
-            'var f3 = this.getField("c3").value;',
-            'var str3 = f3 ? f3.toString() : "";',
-            'var num3 = 0;',
-            'if (str3.indexOf("1d") > -1) { num3 = Number(str3.split("1d")[1]) || 0; }',
-            'else { num3 = Number(str3) || 0; }',
-            'event.value = (n1 * n2) + num3;'
-        ].join(' ');
+            // ORDEM IMPORTA (do maior para o menor) - Mantive a sua lógica exata
+            'if (c2 >= 51) { dText = "1d100"; dNum = 100; }',
+            'else if (c2 >= 27 && c2 <= 50) { dText = "1d50"; dNum = 50; }',
+            'else if (c2 >= 26 && c2 <= 35) { dText = "1d20"; dNum = 20; }', // Nota: Tem uma sobreposição de números aqui no 26/27 da sua lógica, mas mantive como você pediu!
+            'else if (c2 >= 21 && c2 <= 25) { dText = "1d12"; dNum = 12; }',
+            'else if (c2 >= 16 && c2 <= 20) { dText = "1d10"; dNum = 10; }',
+            'else if (c2 >= 11 && c2 <= 15) { dText = "1d8"; dNum = 8; }',
+            'else if (c2 >= 6 && c2 <= 10) { dText = "1d6"; dNum = 6; }',
+            'else { dText = "1d4"; dNum = 4; }',
 
-        // Injetando no C3
-        fields[2].acroField.dict.set(PDFName.of('AA'), docContext.obj({
-            C: docContext.obj({ Type: 'Action', S: 'JavaScript', JS: PDFString.of(logicC3) })
-        }));
+            // Atualiza campo 3
+            'this.getField("c3").value = dText;',
 
-        // Injetando no C4 (Resultado)
-        fields[3].acroField.dict.set(PDFName.of('AA'), docContext.obj({
-            C: docContext.obj({ Type: 'Action', S: 'JavaScript', JS: PDFString.of(logicC4) })
-        }));
+            // Calcula resultado
+            'this.getField("res").value = (c1 * c2) + dNum;'
+        ].join('\n');
 
-        // Gravando a Ordem de Cálculo Exata
+        const action = docContext.obj({
+            Type: 'Action',
+            S: 'JavaScript',
+            JS: PDFString.of(scriptMotor)
+        });
+
+        // Adicionando 'V' (Validate) junto com 'K' para garantir que a mudança na caixa de lista ative a conta
+        fields[0].acroField.dict.set(PDFName.of('AA'), docContext.obj({ K: action, V: action })); 
+        fields[1].acroField.dict.set(PDFName.of('AA'), docContext.obj({ K: action })); 
+
+        // Configuração final do PDF
         const acroForm = pdfDoc.catalog.get(PDFName.of('AcroForm'));
         if (acroForm) {
             const acroFormDict = docContext.lookup(acroForm);
-            acroFormDict.set(PDFName.of('CO'), docContext.obj([fields[2].ref, fields[3].ref]));
             acroFormDict.set(PDFName.of('NeedAppearances'), docContext.obj(true));
         }
 
@@ -133,16 +143,11 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = "ficha_T20_funcional.pdf";
-        document.body.appendChild(a);
+        a.download = "ficha_RPG_calculavel.pdf";
         a.click();
-        
-        setTimeout(() => {
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
-        }, 1000);
+        setTimeout(() => window.URL.revokeObjectURL(url), 1500);
 
     } catch (err) {
-        alert("Erro Técnico: " + err.message);
+        alert("Erro técnico: " + err.message);
     }
 });
