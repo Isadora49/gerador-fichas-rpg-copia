@@ -131,7 +131,7 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = "ficha_T20_calculo_correto.pdf";
+        a.download = "ficha_calculo_correto.pdf";
         a.click();
         setTimeout(() => window.URL.revokeObjectURL(url), 1000);
 
