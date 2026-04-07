@@ -41,7 +41,7 @@ document.getElementById('uploadPdf').addEventListener('change', async (e) => {
     }
 });
 
-// MARCAÇÃO (Limite 24)
+// 2. MARCAÇÃO (Limite aumentado para 24)
 document.getElementById('pdf-canvas').addEventListener('click', (e) => {
     if (clicks.length >= 24 || !pdfOriginalBytes) return;
     const rect = e.target.getBoundingClientRect();
@@ -68,7 +68,7 @@ document.getElementById('pdf-canvas').addEventListener('click', (e) => {
     }
 });
 
-// LOGICA E DOWNLOAD
+// 3. LOGICA E DOWNLOAD
 document.getElementById('btnDownload').addEventListener('click', async () => {
     try {
         const pdfDoc = await PDFDocument.load(pdfOriginalBytes.slice(0));
@@ -77,8 +77,11 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
         const { width, height } = page.getSize();
         const docContext = pdfDoc.context;
 
-        // Gerar nomes de c1 até c24
-        const fieldNames = Array.from({length: 24}, (_, i) => i === 3 ? 'res' : i === 6 ? 'res2' : `c${i+1}`);
+        const fieldNames = [
+            'c1', 'c2', 'c3', 'res', 'c5', 'c6', 'res2', 'c8',
+            'c9', 'c10', 'c11', 'c12', 'c13', 'c14', 'c15', 'c16',
+            'c17', 'c18', 'c19', 'c20', 'c21', 'c22', 'c23', 'c24'
+        ];
         const fields = [];
 
         for (let i = 0; i < 24; i++) {
@@ -89,7 +92,8 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
                 f.select('A');
             } else {
                 f = form.createTextField(fieldNames[i]);
-                // Índices que representam campos de "DADO" (ex: c3, c6, c10, c12... c18, c20, c22, c24)
+                // Índices visuais para campos de "Dado" que iniciam com 1d4
+                // (3, 6, 10, 12, 14, 16, 18, 20, 22, 24) -> No array (índice - 1)
                 const dadosIndices = [2, 5, 9, 11, 13, 15, 17, 19, 21, 23];
                 f.setText(dadosIndices.includes(i) ? "1d4" : "0");
             }
@@ -100,8 +104,56 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             fields.push(f);
         }
 
-        // MOTOR DE CÁLCULO (Agora até o campo 24)
+        // MOTOR DE CÁLCULO AMPLIADO
         const scriptMotor = [
             'var escolha = this.getField("c1").value;',
             'var valBase1 = 0; var valBase2 = 0; var valBase3 = 0;',
-            'if (escolha == "A") { valBase1 = 8; valBase2 =
+            'if (escolha == "A") { valBase1 = 8; valBase2 = 2; valBase3 = 2; }',
+            'else if (escolha == "B") { valBase1 = 2; valBase2 = 4; valBase3 = 2; }',
+            'else if (escolha == "C") { valBase1 = 4; valBase2 = 4; valBase3 = 2; }',
+            
+            'function getDado(nivel) {',
+            '  nivel = Number(nivel) || 0;',
+            '  if (nivel >= 51) return "1d100";',
+            '  if (nivel >= 27) return "1d50";',
+            '  if (nivel >= 26) return "1d20";',
+            '  if (nivel >= 21) return "1d12";',
+            '  if (nivel >= 16) return "1d10";',
+            '  if (nivel >= 11) return "1d8";',
+            '  if (nivel >= 6) return "1d6";',
+            '  return "1d4";',
+            '}',
+
+            // Blocos Iniciais
+            'var n1 = Number(this.getField("c2").value) || 0;',
+            'this.getField("c3").value = getDado(n1);',
+            'var d1N = (n1 >= 51)?100:(n1 >= 27)?50:(n1 >= 26)?20:(n1 >= 21)?12:(n1 >= 16)?10:(n1 >= 11)?8:(n1 >= 6)?6:4;',
+            'this.getField("res").value = (valBase1 * n1) + d1N;',
+            'this.getField("c8").value = (valBase3 * n1) + d1N;',
+
+            'var n2 = Number(this.getField("c5").value) || 0;',
+            'this.getField("c6").value = getDado(n2);',
+            'var d2N = (n2 >= 51)?100:(n2 >= 27)?50:(n2 >= 26)?20:(n2 >= 21)?12:(n2 >= 16)?10:(n2 >= 11)?8:(n2 >= 6)?6:4;',
+            'this.getField("res2").value = (valBase2 * n2) + d2N;',
+
+            // Pares 9-16
+            'this.getField("c10").value = getDado(this.getField("c9").value);',
+            'this.getField("c12").value = getDado(this.getField("c11").value);',
+            'this.getField("c14").value = getDado(this.getField("c13").value);',
+            'this.getField("c16").value = getDado(this.getField("c15").value);',
+
+            // NOVOS Pares 17-24 (17->18, 19->20, 21->22, 23->24)
+            'this.getField("c18").value = getDado(this.getField("c17").value);',
+            'this.getField("c20").value = getDado(this.getField("c19").value);',
+            'this.getField("c22").value = getDado(this.getField("c21").value);',
+            'this.getField("c24").value = getDado(this.getField("c23").value);'
+        ].join('\n');
+
+        const action = docContext.obj({
+            Type: 'Action',
+            S: 'JavaScript',
+            JS: PDFString.of(scriptMotor)
+        });
+
+        // Adicionando Gatilhos (Todos os campos de NÍVEL que disparam o cálculo)
+        // Adicionados
