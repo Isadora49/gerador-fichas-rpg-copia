@@ -2,11 +2,11 @@ const { PDFDocument, PDFName, PDFString } = window.PDFLib || {};
 
 let pdfOriginalBytes = null; 
 let clicks = [];
-const labels = ["C1 (Base)", "C2 (E2)", "C3 (Dado)", "C4 (Total)"];
+const labels = ["C1 (Base)", "C2 (Nível/E2)", "C3 (Dado de Dano)", "C4 (Total)"];
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-// 1. CARREGAMENTO (Clone de ArrayBuffer para evitar erro de 'detached')
+// 1. CARREGAMENTO (Proteção contra Detached Buffer)
 document.getElementById('uploadPdf').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -23,17 +23,16 @@ document.getElementById('uploadPdf').addEventListener('change', async (e) => {
         canvas.height = viewport.height;
         canvas.width = viewport.width;
         await page.render({ canvasContext: context, viewport: viewport }).promise;
-        
         document.querySelectorAll('.marker').forEach(m => m.remove());
         clicks = [];
         document.getElementById('status').innerText = "Clique para: " + labels[0];
         document.getElementById('btnDownload').disabled = true;
     } catch (err) {
-        alert("Erro ao carregar: " + err.message);
+        alert("Erro ao carregar PDF: " + err.message);
     }
 });
 
-// 2. MARCAÇÃO VISUAL
+// 2. MARCAÇÃO (Interface Visual)
 document.getElementById('pdf-canvas').addEventListener('click', (e) => {
     if (clicks.length >= 4 || !pdfOriginalBytes) return;
     const rect = e.target.getBoundingClientRect();
@@ -60,7 +59,7 @@ document.getElementById('pdf-canvas').addEventListener('click', (e) => {
     }
 });
 
-// 3. DOWNLOAD E INJEÇÃO DE LÓGICA ROBUSTA
+// 3. DOWNLOAD E LÓGICA DE CÁLCULO
 document.getElementById('btnDownload').addEventListener('click', async () => {
     try {
         const pdfDoc = await PDFDocument.load(pdfOriginalBytes.slice(0));
@@ -82,43 +81,48 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             fields.push(f);
         }
 
-        // SCRIPT PARA O CAMPO 3 (Escalonamento de Dano)
-        const scriptC3 = `
+        // SCRIPT DO CAMPO 3: ESCALONAMENTO (Lógica de Abril/2026)
+        const logicC3 = `
             var e2 = Number(this.getField("c2").value) || 0;
             var d = "1d4";
-            if (e2 > 50) d = "1d100";
-            else if (e2 > 35) d = "1d50";
-            else if (e2 > 25) d = "1d20";
-            else if (e2 > 20) d = "1d12";
-            else if (e2 > 15) d = "1d10";
-            else if (e2 > 10) d = "1d8";
-            else if (e2 > 5) d = "1d6";
+            if (e2 > 50) { d = "1d100"; }
+            else if (e2 > 35) { d = "1d50"; }
+            else if (e2 > 25) { d = "1d20"; }
+            else if (e2 > 20) { d = "1d12"; }
+            else if (e2 > 15) { d = "1d10"; }
+            else if (e2 > 10) { d = "1d8"; }
+            else if (e2 > 5) { d = "1d6"; }
+            else { d = "1d4"; }
             event.value = d;
         `;
 
-        // SCRIPT PARA O CAMPO 4 (Cálculo Total)
-        const scriptC4 = `
+        // SCRIPT DO CAMPO 4: SOMA TOTAL (Lógica de Abril/2026)
+        const logicC4 = `
             var n1 = Number(this.getField("c1").value) || 0;
             var n2 = Number(this.getField("c2").value) || 0;
-            var v3 = this.getField("c3").valueAsString || "0";
-            var n3 = Number(v3.replace("1d", "")) || 0;
+            var v3 = this.getField("c3").valueAsString || this.getField("c3").value || "";
+            var n3 = 0;
+            if (v3) {
+                var cleanV3 = v3.replace("1d", "");
+                n3 = Number(cleanV3) || 0;
+            }
             event.value = (n1 * n2) + n3;
         `;
 
-        // Injetando as ações de cálculo
+        // Injetar Ações Adicionais (AA)
         fields[2].acroField.dict.set(PDFName.of('AA'), docContext.obj({
-            C: docContext.obj({ Type: 'Action', S: 'JavaScript', JS: PDFString.of(scriptC3) })
+            C: docContext.obj({ Type: 'Action', S: 'JavaScript', JS: PDFString.of(logicC3) })
         }));
 
         fields[3].acroField.dict.set(PDFName.of('AA'), docContext.obj({
-            C: docContext.obj({ Type: 'Action', S: 'JavaScript', JS: PDFString.of(scriptC4) })
+            C: docContext.obj({ Type: 'Action', S: 'JavaScript', JS: PDFString.of(logicC4) })
         }));
 
-        // CONFIGURAÇÃO DE FORMULÁRIO (Essencial para navegadores)
+        // ORDEM DE CÁLCULO (Obrigatório para navegadores)
         const acroForm = pdfDoc.catalog.get(PDFName.of('AcroForm'));
         if (acroForm) {
             const acroFormDict = docContext.lookup(acroForm);
-            // Define explicitamente que C3 calcula antes de RES
+            // Primeiro calcula C3, depois o Resultado (res)
             acroFormDict.set(PDFName.of('CO'), docContext.obj([fields[2].ref, fields[3].ref]));
             acroFormDict.set(PDFName.of('NeedAppearances'), docContext.obj(true));
         }
@@ -127,10 +131,17 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
         const blob = new Blob([finalPdfBytes], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url; a.download = "ficha_T20_final.pdf"; a.click();
-        setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+        a.href = url;
+        a.download = "ficha_T20_corrigida_v3.pdf";
+        document.body.appendChild(a);
+        a.click();
+        
+        setTimeout(() => {
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }, 1500);
 
     } catch (err) {
-        alert("Erro técnico: " + err.message);
+        alert("Erro Técnico: " + err.message);
     }
 });
