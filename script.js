@@ -3,7 +3,7 @@ const { PDFDocument, PDFName, PDFString } = window.PDFLib || {};
 let pdfOriginalBytes = null; 
 let clicks = [];
 // Mudei o rótulo para você saber que é uma lista
-const labels = ["C1 (Lista /B/C)", "C2 (Nível)", "C3 (Dado)", "C4 (Total)"];
+const labels = ["C1 (Classes)", "C2 (Vitalidade)", "C3 (bonosV)", "C4 (Vida)", "C5 (Resistência Mágica)", "C6 (BonusRM)", "C7 (Mana)"];
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
@@ -69,16 +69,16 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
         const { width, height } = page.getSize();
         const docContext = pdfDoc.context;
 
-        const fieldNames = ['c1', 'c2', 'c3', 'res'];
+        const fieldNames = ['c1', 'c2', 'c3', 'vida', 'c5', 'c6', 'mana'];
         const fields = [];
 
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < 7; i++) {
             let f;
             // SE FOR O CAMPO 1 (i === 0), CRIA UMA CAIXA DE LISTA
             if (i === 0) {
                 f = form.createDropdown(fieldNames[i]);
                 f.addOptions(['', 'Tank', 'Destridor']); // Adiciona as opções
-                f.select(''); // Define 'A' como padrão
+                f.select(''); // Define '' como padrão
             } else {
                 // SE FOREM OS OUTROS CAMPOS, CRIA CAMPO DE TEXTO NORMAL
                 f = form.createTextField(fieldNames[i]);
@@ -95,6 +95,7 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
         // SCRIPT UNIFICADO: Lógica da Letra -> Número inclusa
         const scriptMotor = [
             'var escolha = this.getField("c1").value;',
+            'var escolha = this.getField("c5").value;',
             'var c1 = 0;',
             'if (escolha == "Classe") { c1 = 0; }',
             'else if (escolha == "Tank") { c1 = 8; }',
@@ -116,6 +117,35 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
 
             // Atualiza campo 3
             'this.getField("c3").value = dText;',
+            'this.getField("c6").value = dText;',
+
+            // Calcula resultado
+            'this.getField("vida").value = (c1 * c2) + dNum;'
+            'this.getField("mana").value = (c1 * c5) + dNum;'            
+        ].join('\n');
+        const scriptMotor = [
+            'var escolha = this.getField("c5").value;',
+            'var c5 = 0;',
+            'if (escolha == "Classe") { c5 = 0; }',
+            'else if (escolha == "Tank") { c5 = 2; }',
+            'else if (escolha == "Destridor") { c5 = 4; }',
+            
+            'var c6 = Number(this.getField("c6").value) || 0;',
+            'var dText = "";',
+            'var dNum = 0;',
+
+            // ORDEM IMPORTA (do maior para o menor) - Mantive a sua lógica exata
+            'if (c6 >= 51) { dText = "1d100"; dNum = 100; }',
+            'else if (c6 >= 27 && c6 <= 50) { dText = "1d50"; dNum = 50; }',
+            'else if (c6 >= 26 && c6 <= 35) { dText = "1d20"; dNum = 20; }', // Nota: Tem uma sobreposição de números aqui no 26/27 da sua lógica, mas mantive como você pediu!
+            'else if (c6 >= 21 && c6 <= 25) { dText = "1d12"; dNum = 12; }',
+            'else if (c6 >= 16 && c6 <= 20) { dText = "1d10"; dNum = 10; }',
+            'else if (c6 >= 11 && c6 <= 15) { dText = "1d8"; dNum = 8; }',
+            'else if (c6 >= 6 && c6 <= 10) { dText = "1d6"; dNum = 6; }',
+            'else { dText = "1d4"; dNum = 4; }',
+
+            // Atualiza campo 3
+            'this.getField("c7").value = dText;',
 
             // Calcula resultado
             'this.getField("res").value = (c1 * c2) + dNum;'
