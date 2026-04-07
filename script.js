@@ -15,7 +15,7 @@ const labels = [
     "C29 (Nível 13)", "C30 (Dado 13)", "C31 (Nível 14)", "C32 (Dado 14)",
     "C33 (Nível 15)", "C34 (Dado 15)", "C35 (Nível 16)", "C36 (Dado 16)",
     "C37 (Texto 1)", "C38 (Texto 2)", "C39 (Texto 3)", "C40 (Texto 4)",
-    "C41 (2 Linhas)", "C42 (2 Linhas)", "C43 (2 Linhas)"
+    "C41 (2 Linhas A)", "C42 (2 Linhas B)", "C43 (2 Linhas C)"
 ];
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
@@ -68,75 +68,4 @@ document.getElementById('pdf-canvas').addEventListener('click', (e) => {
     document.body.appendChild(marker);
     
     if (clicks.length === 43) {
-        document.getElementById('status').innerText = "Pronto!";
-        document.getElementById('btnDownload').disabled = false;
-    } else {
-        document.getElementById('status').innerText = "Clique para: " + labels[clicks.length];
-    }
-});
-
-// LOGICA E DOWNLOAD
-document.getElementById('btnDownload').addEventListener('click', async () => {
-    try {
-        const pdfDoc = await PDFDocument.load(pdfOriginalBytes.slice(0));
-        const form = pdfDoc.getForm();
-        const page = pdfDoc.getPage(0);
-        const { width, height } = page.getSize();
-        const docContext = pdfDoc.context;
-
-        // Gerar nomes de c1 até c43
-        const fieldNames = Array.from({length: 43}, (_, i) => {
-            if (i === 3) return 'res';
-            if (i === 6) return 'res2';
-            return `c${i+1}`;
-        });
-        
-        const fields = [];
-
-        for (let i = 0; i < 43; i++) {
-            let f;
-            if (i === 0) {
-                f = form.createDropdown(fieldNames[i]);
-                f.addOptions(['A', 'B', 'C']);
-                f.select('A');
-            } else {
-                f = form.createTextField(fieldNames[i]);
-                
-                // Lógica de valores iniciais (0 a 35)
-                if (i < 36) {
-                    const dadosIndices = [2, 5, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35];
-                    f.setText(dadosIndices.includes(i) ? "1d4" : "0");
-                } else {
-                    f.setText(""); 
-                }
-
-                // CONFIGURAÇÃO DUAS LINHAS (Campos C41, C42, C43)
-                // Índices 40, 41 e 42
-                if (i >= 40) {
-                    f.enableMultiline(); 
-                }
-            }
-
-            const pos = clicks[i];
-            const pdfX = (pos.x * width) / pos.w;
-            const pdfY = height - ((pos.y * height) / pos.h);
-            
-            // Aumentamos a altura (height) para 40 nos campos multiline para caber 2 linhas
-            const campoHeight = (i >= 40) ? 40 : 20;
-            
-            f.addToPage(page, { 
-                x: pdfX, 
-                y: pdfY - campoHeight, 
-                width: 100, // Aumentado um pouco a largura para textos livres
-                height: campoHeight 
-            });
-            fields.push(f);
-        }
-
-        // MOTOR DE CÁLCULO (Permanece para os primeiros 36 campos)
-        const scriptMotor = [
-            'var escolha = this.getField("c1").value;',
-            'var valBase1 = 0; var valBase2 = 0; var valBase3 = 0;',
-            'if (escolha == "A") { valBase1 = 8; valBase2 = 2; valBase3 = 2; }',
-            'else if (escolha == "B") { valBase1 = 2; valBase2 = 4; valBase3 = 2; }',
-            'else if (escolha == "C") { valBase1 = 4; valBase2 = 4; valBase3 = 2
+        document.getElementById('status').innerText =
