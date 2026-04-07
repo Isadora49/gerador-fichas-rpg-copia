@@ -3,7 +3,7 @@ const { PDFDocument, PDFName, PDFString } = window.PDFLib || {};
 let pdfOriginalBytes = null; 
 let clicks = [];
 // Mudei o rótulo para você saber que é uma lista
-const labels = ["C1 (Lista A/B/C)", "C2 (Nível)", "C3 (Dado)", "C4 (Total)"];
+const labels = ["C1 (Lista /B/C)", "C2 (Nível)", "C3 (Dado)", "C4 (Total)"];
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
@@ -77,8 +77,8 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             // SE FOR O CAMPO 1 (i === 0), CRIA UMA CAIXA DE LISTA
             if (i === 0) {
                 f = form.createDropdown(fieldNames[i]);
-                f.addOptions(['Classes', 'Tank', 'Destridor']); // Adiciona as opções
-                f.select('Classes'); // Define 'A' como padrão
+                f.addOptions(['', 'Tank', 'Destridor']); // Adiciona as opções
+                f.select(''); // Define 'A' como padrão
             } else {
                 // SE FOREM OS OUTROS CAMPOS, CRIA CAMPO DE TEXTO NORMAL
                 f = form.createTextField(fieldNames[i]);
