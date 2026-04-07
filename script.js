@@ -2,11 +2,11 @@ const { PDFDocument, PDFName, PDFString } = window.PDFLib || {};
 
 let pdfOriginalBytes = null; 
 let clicks = [];
-const labels = ["C1 (Base)", "C2 (E2)", "C3 (Escalonado)", "C4 (Resultado)"];
+const labels = ["C1 (Base)", "C2 (E2/Nível)", "C3 (Dado Automático)", "C4 (Total)"];
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-// 1. CARREGAMENTO (Com proteção de memória)
+// 1. CARREGAMENTO COM CÓPIA DE SEGURANÇA
 document.getElementById('uploadPdf').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -32,7 +32,7 @@ document.getElementById('uploadPdf').addEventListener('change', async (e) => {
     }
 });
 
-// 2. MARCAÇÃO
+// 2. MARCAÇÃO DOS PONTOS
 document.getElementById('pdf-canvas').addEventListener('click', (e) => {
     if (clicks.length >= 4 || !pdfOriginalBytes) return;
     const rect = e.target.getBoundingClientRect();
@@ -52,14 +52,14 @@ document.getElementById('pdf-canvas').addEventListener('click', (e) => {
     marker.innerText = labels[clicks.length - 1];
     document.body.appendChild(marker);
     if (clicks.length === 4) {
-        document.getElementById('status').innerText = "Download Disponível!";
+        document.getElementById('status').innerText = "Pronto para baixar!";
         document.getElementById('btnDownload').disabled = false;
     } else {
         document.getElementById('status').innerText = "Clique para: " + labels[clicks.length];
     }
 });
 
-// 3. GERAÇÃO DO PDF COM CÁLCULOS TIPO NAVEGADOR
+// 3. GERAÇÃO DO PDF COM CÁLCULO COMPATÍVEL
 document.getElementById('btnDownload').addEventListener('click', async () => {
     try {
         const pdfDoc = await PDFDocument.load(pdfOriginalBytes.slice(0));
@@ -81,8 +81,11 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             fields.push(f);
         }
 
-        // LÓGICA DO CAMPO 3 (Escalonamento)
-        const scriptC3 = `
+        // Bloquear o campo 3 para o usuário não digitar por cima
+        fields[2].enableReadOnly();
+
+        // SCRIPT DO CAMPO 3 (DADO ESCALONADO) - SINTAXE CHROME
+        const logicC3 = `
             var e2 = Number(this.getField("c2").value) || 0;
             var d = "1d4";
             if (e2 >= 51) d = "1d100";
@@ -95,34 +98,31 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             event.value = d;
         `;
 
-        // LÓGICA DO CAMPO 4 (Resultado Final)
-        // Usamos toString() e replace para limpar o "1d" com segurança
-        const scriptC4 = `
-            var v1 = Number(this.getField("c1").value) || 0;
-            var v2 = Number(this.getField("c2").value) || 0;
-            var c3val = this.getField("c3").value.toString();
-            var n3 = Number(c3val.replace("1d", "")) || 0;
-            event.value = (v1 * v2) + n3;
+        // SCRIPT DO CAMPO 4 (TOTAL) - SINTAXE CHROME
+        const logicC4 = `
+            var n1 = Number(this.getField("c1").value) || 0;
+            var n2 = Number(this.getField("c2").value) || 0;
+            var v3 = this.getField("c3").value;
+            var s3 = v3 ? v3.toString() : "1d4";
+            var n3 = Number(s3.replace("1d", "")) || 0;
+            event.value = (n1 * n2) + n3;
         `;
 
-        // Injetar Ações Adicionais (AA) -> Calculate (C)
+        // Injetar scripts de cálculo (Gatilho 'C')
         fields[2].acroField.dict.set(PDFName.of('AA'), docContext.obj({
-            C: docContext.obj({ Type: 'Action', S: 'JavaScript', JS: PDFString.of(scriptC3) })
+            C: docContext.obj({ Type: 'Action', S: 'JavaScript', JS: PDFString.of(logicC3) })
         }));
 
         fields[3].acroField.dict.set(PDFName.of('AA'), docContext.obj({
-            C: docContext.obj({ Type: 'Action', S: 'JavaScript', JS: PDFString.of(scriptC4) })
+            C: docContext.obj({ Type: 'Action', S: 'JavaScript', JS: PDFString.of(logicC4) })
         }));
 
-        // CONFIGURAÇÃO DO FORMULÁRIO (Essencial para Chrome/Edge)
+        // CONFIGURAÇÃO CRUCIAL DA ORDEM DE CÁLCULO (CO)
         const acroForm = pdfDoc.catalog.get(PDFName.of('AcroForm'));
         if (acroForm) {
             const acroFormDict = docContext.lookup(acroForm);
-            
-            // Define a ORDEM DE CÁLCULO (CO): c3 primeiro, res depois
+            // IMPORTANTE: Primeiro calcula o C3 (dado), depois o RES (total)
             acroFormDict.set(PDFName.of('CO'), docContext.obj([fields[2].ref, fields[3].ref]));
-            
-            // NeedAppearances ajuda o navegador a "pintar" o resultado na tela
             acroFormDict.set(PDFName.of('NeedAppearances'), docContext.obj(true));
         }
 
@@ -131,11 +131,17 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = "ficha_calculo_correto.pdf";
+        a.download = "ficha_T20_v3.pdf";
+        document.body.appendChild(a);
         a.click();
-        setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+        
+        setTimeout(() => {
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }, 1000);
 
     } catch (err) {
-        alert("Erro na geração: " + err.message);
+        console.error(err);
+        alert("Erro: " + err.message);
     }
 });
