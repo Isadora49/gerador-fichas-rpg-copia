@@ -1,4 +1,5 @@
 // Adicionado TextAlignment na desestruturação
+cons// Adicionado TextAlignment na desestruturação
 const { PDFDocument, PDFName, PDFString, TextAlignment } = window.PDFLib || {};
 
 let pdfOriginalBytes = null;
