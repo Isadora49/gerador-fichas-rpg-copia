@@ -2,8 +2,8 @@ const { PDFDocument, PDFName, PDFString } = window.PDFLib || {};
 
 let pdfOriginalBytes = null;
 let clicks = [];
-let isDragging = false;
-let startX, startY;
+let currentW = 60;
+let currentH = 20;
 
 const labels = [
     "C1 (Lista Base)", "C2 (Nível 1)", "C3 (Dado 1)", "C4 (Total 1)", 
@@ -19,208 +19,162 @@ const labels = [
     "C41 (Multi-linha 1)", "C42 (Multi-linha 2)", "C43 (Multi-linha 3)"
 ];
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+const preview = document.getElementById('field-preview');
+const canvas = document.getElementById('pdf-canvas');
 
-// CARREGAMENTO
+// Carregamento do PDF
 document.getElementById('uploadPdf').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    try {
-        const arrayBuffer = await file.arrayBuffer();
-        pdfOriginalBytes = arrayBuffer.slice(0);
-        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer.slice(0) });
-        const pdf = await loadingTask.promise;
-        const page = await pdf.getPage(1);
-        const viewport = page.getViewport({ scale: 1.5 });
-        const canvas = document.getElementById('pdf-canvas');
-        const context = canvas.getContext('2d');
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
-        await page.render({ canvasContext: context, viewport: viewport }).promise;
-        
-        document.querySelectorAll('.marker').forEach(m => m.remove());
-        clicks = [];
-        document.getElementById('status').innerText = "Arraste para criar: " + labels[0];
-        document.getElementById('btnDownload').disabled = true;
-    } catch (err) {
-        alert("Erro no PDF: " + err.message);
+    const arrayBuffer = await file.arrayBuffer();
+    pdfOriginalBytes = arrayBuffer.slice(0);
+    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+    const pdf = await loadingTask.promise;
+    const page = await pdf.getPage(1);
+    const viewport = page.getViewport({ scale: 1.5 });
+    const context = canvas.getContext('2d');
+    canvas.height = viewport.height;
+    canvas.width = viewport.width;
+    await page.render({ canvasContext: context, viewport: viewport }).promise;
+    
+    document.querySelectorAll('.marker').forEach(m => m.remove());
+    clicks = [];
+    document.getElementById('status').innerHTML = `Clique para: <b>${labels[0]}</b> <br><small>Scroll: L / Shift+Scroll: A</small>`;
+    preview.style.display = 'block';
+});
+
+// Lógica do Mouse (Tamanho e Preview)
+document.getElementById('canvas-wrapper').addEventListener('mousemove', (e) => {
+    if (!pdfOriginalBytes || clicks.length >= 43) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    preview.style.width = currentW + 'px';
+    preview.style.height = currentH + 'px';
+    preview.style.left = (x - currentW / 2) + 'px';
+    preview.style.top = (y - currentH / 2) + 'px';
+});
+
+// Ajustar tamanho com o Scroll
+window.addEventListener('wheel', (e) => {
+    if (!pdfOriginalBytes || clicks.length >= 43) return;
+    
+    e.preventDefault(); // Impede scroll da página
+    const delta = e.deltaY > 0 ? -5 : 5;
+
+    if (e.shiftKey) {
+        currentH = Math.max(10, currentH + delta);
+    } else {
+        currentW = Math.max(10, currentW + delta);
     }
-});
 
-// LÓGICA DE DESENHO DINÂMICO COM MOUSE
-const canvas = document.getElementById('pdf-canvas');
-const selectionRect = document.getElementById('selection-rect');
+    preview.style.width = currentW + 'px';
+    preview.style.height = currentH + 'px';
+}, { passive: false });
 
-canvas.addEventListener('mousedown', (e) => {
+// Marcar Campo
+canvas.addEventListener('click', (e) => {
     if (clicks.length >= 43 || !pdfOriginalBytes) return;
-    isDragging = true;
-    const rect = canvas.getBoundingClientRect();
-    startX = e.clientX - rect.left;
-    startY = e.clientY - rect.top;
-
-    selectionRect.style.display = 'block';
-    selectionRect.style.left = e.pageX + 'px';
-    selectionRect.style.top = e.pageY + 'px';
-    selectionRect.style.width = '0px';
-    selectionRect.style.height = '0px';
-});
-
-window.addEventListener('mousemove', (e) => {
-    if (!isDragging) return;
-    const currentX = e.pageX;
-    const currentY = e.pageY;
-
-    const width = currentX - (startX + canvas.getBoundingClientRect().left + window.scrollX);
-    const height = currentY - (startY + canvas.getBoundingClientRect().top + window.scrollY);
-
-    selectionRect.style.width = Math.abs(width) + 'px';
-    selectionRect.style.height = Math.abs(height) + 'px';
-    if (width < 0) selectionRect.style.left = currentX + 'px';
-    if (height < 0) selectionRect.style.top = currentY + 'px';
-});
-
-window.addEventListener('mouseup', (e) => {
-    if (!isDragging) return;
-    isDragging = false;
-    selectionRect.style.display = 'none';
 
     const rect = canvas.getBoundingClientRect();
-    const finalX = e.clientX - rect.left;
-    const finalY = e.clientY - rect.top;
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
 
-    // Calcula largura e altura finais
-    const w = Math.max(Math.abs(finalX - startX), 10); // Mínimo 10px
-    const h = Math.max(Math.abs(finalY - startY), 10);
-    const x = Math.min(startX, finalX);
-    const y = Math.min(startY, finalY);
+    clicks.push({ x, y, cw: canvas.width, ch: canvas.height, fw: currentW, fh: currentH });
 
-    // Salva o clique com dimensões personalizadas
-    clicks.push({ x, y, w: rect.width, h: rect.height, fieldW: w, fieldH: h });
-
-    // Cria o marcador visual proporcional ao desenho
     const marker = document.createElement('div');
     marker.className = 'marker';
-    marker.style.left = (x + rect.left + window.scrollX) + 'px';
-    marker.style.top = (y + rect.top + window.scrollY) + 'px';
-    marker.style.width = w + 'px';
-    marker.style.height = h + 'px';
+    marker.style.width = currentW + 'px';
+    marker.style.height = currentH + 'px';
+    marker.style.left = (x - currentW / 2) + 'px';
+    marker.style.top = (y - currentH / 2) + 'px';
     marker.innerText = labels[clicks.length - 1];
-    document.body.appendChild(marker);
+    document.getElementById('canvas-wrapper').appendChild(marker);
 
     if (clicks.length === 43) {
-        document.getElementById('status').innerText = "Pronto!";
+        preview.style.display = 'none';
+        document.getElementById('status').innerText = "Pronto para baixar!";
         document.getElementById('btnDownload').disabled = false;
     } else {
-        document.getElementById('status').innerText = "Arraste para criar: " + labels[clicks.length];
+        document.getElementById('status').innerHTML = `Próximo: <b>${labels[clicks.length]}</b>`;
     }
 });
 
-// LOGICA E DOWNLOAD
+// Download e Processamento PDF
 document.getElementById('btnDownload').addEventListener('click', async () => {
     try {
-        const pdfDoc = await PDFDocument.load(pdfOriginalBytes.slice(0));
+        const pdfDoc = await PDFDocument.load(pdfOriginalBytes);
         const form = pdfDoc.getForm();
         const page = pdfDoc.getPage(0);
         const { width, height } = page.getSize();
-        const docContext = pdfDoc.context;
-
-        const fieldNames = Array.from({length: 43}, (_, i) => {
-            if (i === 3) return 'res';
-            if (i === 6) return 'res2';
-            return `c${i+1}`;
-        });
 
         for (let i = 0; i < 43; i++) {
-            const pos = clicks[i];
+            const data = clicks[i];
+            const name = (i === 3) ? 'res' : (i === 6) ? 'res2' : `c${i+1}`;
+            
             let f;
-
             if (i === 0) {
-                f = form.createDropdown(fieldNames[i]);
+                f = form.createDropdown(name);
                 f.addOptions(['A', 'B', 'C']);
                 f.select('A');
             } else {
-                f = form.createTextField(fieldNames[i]);
+                f = form.createTextField(name);
                 if (i < 36) {
                     const dadosIndices = [2, 5, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35];
                     f.setText(dadosIndices.includes(i) ? "1d4" : "0");
-                } else if (i >= 40) {
-                    f.enableMultiline();
                 }
+                if (i >= 40) f.enableMultiline();
             }
 
-            // Mapeamento proporcional para o tamanho real do PDF
-            const pdfX = (pos.x * width) / pos.w;
-            const pdfY = height - ((pos.y * height) / pos.h);
-            const pdfW = (pos.fieldW * width) / pos.w;
-            const pdfH = (pos.fieldH * height) / pos.h;
+            // Converter coordenadas Canvas -> PDF
+            const pdfX = (data.x * width) / data.cw;
+            const pdfY = height - (data.y * height) / data.ch;
+            const finalW = (data.fw * width) / data.cw;
+            const finalH = (data.fh * height) / data.ch;
 
-            f.addToPage(page, { 
-                x: pdfX, 
-                y: pdfY - pdfH, 
-                width: pdfW, 
-                height: pdfH 
+            f.addToPage(page, {
+                x: pdfX - finalW / 2,
+                y: pdfY - finalH / 2,
+                width: finalW,
+                height: finalH
             });
         }
 
-        // MOTOR DE CÁLCULO (Omitido para brevidade, mas deve ser colado o mesmo script anterior aqui)
-        const scriptMotor = [
-            'var escolha = this.getField("c1").value;',
-            'var valBase1 = 0; var valBase2 = 0; var valBase3 = 0;',
-            'if (escolha == "A") { valBase1 = 8; valBase2 = 2; valBase3 = 2; }',
-            'else if (escolha == "B") { valBase1 = 2; valBase2 = 4; valBase3 = 2; }',
-            'else if (escolha == "C") { valBase1 = 4; valBase2 = 4; valBase3 = 2; }',
-            'function getDado(nivel) {',
-            '  nivel = Number(nivel) || 0;',
-            '  if (nivel >= 51) return "1d100"; if (nivel >= 27) return "1d50";',
-            '  if (nivel >= 26) return "1d20"; if (nivel >= 21) return "1d12";',
-            '  if (nivel >= 16) return "1d10"; if (nivel >= 11) return "1d8";',
-            '  if (nivel >= 6) return "1d6"; return "1d4";',
-            '}',
-            'var n1 = Number(this.getField("c2").value) || 0;',
-            'this.getField("c3").value = getDado(n1);',
-            'var d1N = (n1 >= 51)?100:(n1 >= 27)?50:(n1 >= 26)?20:(n1 >= 21)?12:(n1 >= 16)?10:(n1 >= 11)?8:(n1 >= 6)?6:4;',
-            'this.getField("res").value = (valBase1 * n1) + d1N;',
-            'this.getField("c8").value = (valBase3 * n1) + d1N;',
-            'var n2 = Number(this.getField("c5").value) || 0;',
-            'this.getField("c6").value = getDado(n2);',
-            'var d2N = (n2 >= 51)?100:(n2 >= 27)?50:(n2 >= 26)?20:(n2 >= 21)?12:(n2 >= 16)?10:(n2 >= 11)?8:(n2 >= 6)?6:4;',
-            'this.getField("res2").value = (valBase2 * n2) + d2N;',
-            'this.getField("c10").value = getDado(this.getField("c9").value);',
-            'this.getField("c12").value = getDado(this.getField("c11").value);',
-            'this.getField("c14").value = getDado(this.getField("c13").value);',
-            'this.getField("c16").value = getDado(this.getField("c15").value);',
-            'this.getField("c18").value = getDado(this.getField("c17").value);',
-            'this.getField("c20").value = getDado(this.getField("c19").value);',
-            'this.getField("c22").value = getDado(this.getField("c21").value);',
-            'this.getField("c24").value = getDado(this.getField("c23").value);',
-            'this.getField("c26").value = getDado(this.getField("c25").value);',
-            'this.getField("c28").value = getDado(this.getField("c27").value);',
-            'this.getField("c30").value = getDado(this.getField("c29").value);',
-            'this.getField("c32").value = getDado(this.getField("c31").value);',
-            'this.getField("c34").value = getDado(this.getField("c33").value);',
-            'this.getField("c36").value = getDado(this.getField("c35").value);'
-        ].join('\n');
+        // --- MOTOR DE CÁLCULO MANTIDO ---
+        const scriptMotor = `
+            var escolha = this.getField("c1").value;
+            var valBase1 = 0; var valBase2 = 0; var valBase3 = 0;
+            if (escolha == "A") { valBase1 = 8; valBase2 = 2; valBase3 = 2; }
+            else if (escolha == "B") { valBase1 = 2; valBase2 = 4; valBase3 = 2; }
+            else if (escolha == "C") { valBase1 = 4; valBase2 = 4; valBase3 = 2; }
+            function getDado(nivel) {
+                nivel = Number(nivel) || 0;
+                if (nivel >= 51) return "1d100"; if (nivel >= 27) return "1d50";
+                if (nivel >= 26) return "1d20"; if (nivel >= 21) return "1d12";
+                if (nivel >= 16) return "1d10"; if (nivel >= 11) return "1d8";
+                if (nivel >= 6) return "1d6"; return "1d4";
+            }
+            var n1 = Number(this.getField("c2").value) || 0;
+            this.getField("c3").value = getDado(n1);
+            var d1N = (n1 >= 51)?100:(n1 >= 27)?50:(n1 >= 26)?20:(n1 >= 21)?12:(n1 >= 16)?10:(n1 >= 11)?8:(n1 >= 6)?6:4;
+            this.getField("res").value = (valBase1 * n1) + d1N;
+            this.getField("c8").value = (valBase3 * n1) + d1N;
+            var n2 = Number(this.getField("c5").value) || 0;
+            this.getField("c6").value = getDado(n2);
+            var d2N = (n2 >= 51)?100:(n2 >= 27)?50:(n2 >= 26)?20:(n2 >= 21)?12:(n2 >= 16)?10:(n2 >= 11)?8:(n2 >= 6)?6:4;
+            this.getField("res2").value = (valBase2 * n2) + d2N;
+            for(var i=9; i<=35; i+=2) {
+                this.getField("c"+(i+1)).value = getDado(this.getField("c"+i).value);
+            }
+        `;
 
-        const action = docContext.obj({
-            Type: 'Action',
-            S: 'JavaScript',
-            JS: PDFString.of(scriptMotor)
-        });
-
-        const acroForm = pdfDoc.catalog.get(PDFName.of('AcroForm'));
-        if (acroForm) {
-            const acroFormDict = docContext.lookup(acroForm);
-            acroFormDict.set(PDFName.of('NeedAppearances'), docContext.obj(true));
-        }
-
-        const finalPdfBytes = await pdfDoc.save();
-        const blob = new Blob([finalPdfBytes], { type: 'application/pdf' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = "ficha_RPG_editavel.pdf";
-        a.click();
-    } catch (err) {
-        alert("Erro técnico: " + err.message);
-    }
+        const pdfBytes = await pdfDoc.save();
+        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = "ficha_rpg_ajustada.pdf";
+        link.click();
+    } catch (e) { alert(e.message); }
 });
