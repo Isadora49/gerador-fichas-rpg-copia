@@ -14,19 +14,20 @@
         button { background: #e74c3c; color: white; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; }
         button:disabled { background: #555; cursor: not-allowed; }
         
+        /* Marcador Interativo */
         .marker {
             position: absolute;
             background: rgba(231, 76, 60, 0.6);
             border: 2px solid #e74c3c;
             color: white;
-            font-size: 12px; /* Ajustado para 12px */
+            font-size: 10px;
             font-weight: bold;
             display: flex;
             align-items: center;
             justify-content: center;
             text-align: center;
-            cursor: move;
-            resize: both;
+            cursor: move; /* Indica que pode arrastar */
+            resize: both; /* Permite redimensionar pelo canto inferior direito */
             overflow: hidden;
             min-width: 30px;
             min-height: 15px;
