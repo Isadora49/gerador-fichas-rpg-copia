@@ -116,18 +116,16 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             if (!el) continue;
 
             let name = (i === 3) ? 'res' : (i === 6) ? 'res2' : `c${i+1}`;
-            
             let f;
+
             if (i === 0) {
-                // CORREÇÃO AQUI: As opções precisam combinar com o motor de cálculo!
                 f = form.createDropdown(name);
                 const opcoesClasses = [
                     ' ', 'Tank', 'Hibrido', 'Assassino', 'Destruidor', 
                     'Arcano', 'Mentalista', 'Vitalista', 'Invocador', 'Elementalista'
                 ];
                 f.addOptions(opcoesClasses);
-                f.select(' '); // Seleciona o vazio por padrão
-                
+                f.select(' ');
             } else {
                 f = form.createTextField(name);
                 if (i < 36) {
@@ -136,8 +134,9 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
                 } else if (i >= 40) {
                     f.enableMultiline();
                 }
-
-                // CORREÇÃO DO ERRO: Aplica formatação APENAS nos TextFields
+                
+                // Força a aparência padrão para evitar o erro de /DA
+                f.acroField.dict.set(PDFName.of('DA'), PDFString.of('/Helvetica 12 Tf 0 g'));
                 f.setFontSize(12);
                 f.setAlignment(TextAlignment.Center);
             }
@@ -155,6 +154,7 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             f.addToPage(page, { x: pdfX, y: pdfY, width: pdfW, height: pdfH });
         }
 
+        // --- SCRIPT DO MOTOR (MANTIDO) ---
         const scriptMotor = [
             'var escolha = this.getField("c1").value;',
             'var valBase1 = 0; var valBase2 = 0; var valBase3 = 0;',
@@ -206,10 +206,16 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             JS: PDFString.of(scriptMotor)
         });
 
-        const triggerIndices = [0, 1, 4, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34]; 
-        const allFields = form.getFields();
-        triggerIndices.forEach(idx => {
-            allFields[idx].acroField.dict.set(PDFName.of('AA'), pdfDoc.context.obj({ K: action, V: action }));
+        // Aplicamos o trigger AA nos campos relevantes
+        const triggerNames = ['c1', 'c2', 'c5', 'c9', 'c11', 'c13', 'c15', 'c17', 'c19', 'c21', 'c23', 'c25', 'c27', 'c29', 'c31', 'c33', 'c35'];
+        triggerNames.forEach(name => {
+            try {
+                const field = form.getField(name);
+                field.acroField.dict.set(PDFName.of('AA'), pdfDoc.context.obj({ 
+                    K: action, 
+                    V: action 
+                }));
+            } catch(e) { console.warn("Campo não encontrado para trigger:", name); }
         });
 
         const finalPdfBytes = await pdfDoc.save();
