@@ -12,30 +12,24 @@
         canvas { border: 1px solid #000; box-shadow: 0 0 20px rgba(0,0,0,0.5); cursor: crosshair; margin: 20px; }
         button { background: #e74c3c; color: white; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; }
         button:disabled { background: #555; cursor: not-allowed; }
-        
-        /* Marcador fixo */
-        .marker { 
-            position: absolute; 
-            background: rgba(231, 76, 60, 0.4); 
-            border: 2px solid #e74c3c;
-            color: white; 
-            font-size: 10px; 
-            pointer-events: none; 
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-        }
+        .marker { position: absolute; background: rgba(231, 76, 60, 0.8); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; pointer-events: none; transform: translate(-50%, -50%); }
+    </style>
+</head>
+<body>
 
-        /* Retângulo de seleção dinâmica */
-        #selection-rect {
-            position: absolute;
-            border: 2px dashed #3498db;
-            background: rgba(52, 152, 219, 0.3);
-            pointer-events: none;
-            display: none;
-            z-index: 1000;
-        }
+<div id="toolbar">
+    <input type="file" id="uploadPdf" accept="application/pdf">
+    <div id="status">Selecione um PDF</div>
+    <button id="btnDownload" disabled>BAIXAR PDF CONFIGURADO</button>
+</div>
+
+<div id="viewer-container" id="container">
+    <canvas id="pdf-canvas"></canvas>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
     </style>
 </head>
 <body>
