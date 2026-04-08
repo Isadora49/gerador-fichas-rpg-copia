@@ -45,42 +45,49 @@ document.getElementById('uploadPdf').addEventListener('change', async (e) => {
     }
 });
 
-// MARCAÇÃO COM TAMANHO DINÂMICO
+// MARCAÇÃO COM VISUALIZAÇÃO DE TAMANHO REAL
 document.getElementById('pdf-canvas').addEventListener('click', (e) => {
     if (clicks.length >= 43 || !pdfOriginalBytes) return;
-    
-    // Captura o tamanho desejado dos inputs no momento do clique
-    const customW = parseInt(document.getElementById('fieldWidth').value) || 60;
-    const customH = parseInt(document.getElementById('fieldHeight').value) || 20;
+
+    // Pega o tamanho definido nos inputs do site
+    const currentW = parseInt(document.getElementById('fieldWidth').value) || 60;
+    const currentH = parseInt(document.getElementById('fieldHeight').value) || 20;
 
     const rect = e.target.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    // Salvamos a posição E o tamanho definido para este campo específico
+    // Salva a posição e o tamanho escolhido para este clique específico
     clicks.push({ 
         x, y, 
-        canvasW: rect.width, 
-        canvasH: rect.height,
-        fieldW: customW,
-        fieldH: customH
+        wCanvas: rect.width, 
+        hCanvas: rect.height,
+        fW: currentW,
+        fH: currentH
     });
     
+    // Criar o marcador visual na tela
     const marker = document.createElement('div');
     marker.className = 'marker';
     marker.style.left = e.pageX + 'px';
     marker.style.top = e.pageY + 'px';
-    marker.style.position = 'absolute';
-    marker.style.background = '#e74c3c';
-    marker.style.color = 'white';
-    marker.style.padding = '4px';
-    marker.style.borderRadius = '4px';
-    marker.style.zIndex = "100";
-    marker.style.fontSize = "10px";
-    marker.style.pointerEvents = "none"; // Não atrapalha cliques futuros
     
-    // Mostra o rótulo e o tamanho escolhido no marcador para conferência
-    marker.innerText = `${labels[clicks.length - 1]} (${customW}x${customH})`;
+    // Aplica o tamanho real no marcador visual (com borda para visualização)
+    marker.style.width = currentW + 'px';
+    marker.style.height = currentH + 'px';
+    marker.style.border = "1px solid yellow";
+    marker.style.background = 'rgba(231, 76, 60, 0.7)';
+    marker.style.position = 'absolute';
+    marker.style.color = 'white';
+    marker.style.display = 'flex';
+    marker.style.alignItems = 'center';
+    marker.style.justifyContent = 'center';
+    marker.style.fontSize = '9px';
+    marker.style.pointerEvents = 'none';
+    marker.style.transform = 'translate(-50%, -50%)'; // Centraliza o campo no clique
+    marker.style.zIndex = "100";
+    
+    marker.innerText = labels[clicks.length - 1];
     document.body.appendChild(marker);
     
     if (clicks.length === 43) {
@@ -91,7 +98,7 @@ document.getElementById('pdf-canvas').addEventListener('click', (e) => {
     }
 });
 
-// LOGICA E DOWNLOAD
+// GERAÇÃO DO PDF
 document.getElementById('btnDownload').addEventListener('click', async () => {
     try {
         const pdfDoc = await PDFDocument.load(pdfOriginalBytes.slice(0));
@@ -118,33 +125,29 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
                 f.select('A');
             } else {
                 f = form.createTextField(fieldNames[i]);
-                
                 if (i < 36) {
                     const dadosIndices = [2, 5, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35];
                     f.setText(dadosIndices.includes(i) ? "1d4" : "0");
                 } else if (i >= 40) {
-                    f.enableMultiline(); // C41, C42, C43
-                    f.setText("");
-                } else {
-                    f.setText(""); 
+                    f.enableMultiline();
                 }
             }
 
-            // Cálculo da posição proporcional
-            const pdfX = (pos.x * width) / pos.canvasW;
-            const pdfY = height - ((pos.y * height) / pos.canvasH);
+            // Mapeamento proporcional para o PDF
+            const pdfX = (pos.x * width) / pos.wCanvas;
+            const pdfY = height - ((pos.y * height) / pos.hCanvas);
             
-            // USA O TAMANHO SALVO NO CLIQUE
+            // Usa exatamente a largura e altura salva no momento do clique
             f.addToPage(page, { 
-                x: pdfX, 
-                y: pdfY - (pos.fieldH / 2), // Centraliza o campo no clique
-                width: pos.fieldW, 
-                height: pos.fieldH 
+                x: pdfX - (pos.fW / 2), 
+                y: pdfY - (pos.fH / 2), 
+                width: pos.fW, 
+                height: pos.fH 
             });
             fields.push(f);
         }
 
-        // --- MOTOR DE CÁLCULO (Inalterado) ---
+        // MOTOR DE CÁLCULO (Omitido aqui por brevidade, mas mantido o mesmo do seu código original)
         const scriptMotor = [
             'var escolha = this.getField("c1").value;',
             'var valBase1 = 0; var valBase2 = 0; var valBase3 = 0;',
@@ -183,12 +186,7 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             'this.getField("c36").value = getDado(this.getField("c35").value);'
         ].join('\n');
 
-        const action = docContext.obj({
-            Type: 'Action',
-            S: 'JavaScript',
-            JS: PDFString.of(scriptMotor)
-        });
-
+        const action = docContext.obj({ Type: 'Action', S: 'JavaScript', JS: PDFString.of(scriptMotor) });
         const triggerIndices = [0, 1, 4, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34]; 
         triggerIndices.forEach(idx => {
             fields[idx].acroField.dict.set(PDFName.of('AA'), docContext.obj({ K: action, V: action }));
@@ -196,18 +194,16 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
 
         const acroForm = pdfDoc.catalog.get(PDFName.of('AcroForm'));
         if (acroForm) {
-            const acroFormDict = docContext.lookup(acroForm);
-            acroFormDict.set(PDFName.of('NeedAppearances'), docContext.obj(true));
+            docContext.lookup(acroForm).set(PDFName.of('NeedAppearances'), docContext.obj(true));
         }
 
         const finalPdfBytes = await pdfDoc.save();
         const blob = new Blob([finalPdfBytes], { type: 'application/pdf' });
-        const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url;
+        a.href = URL.createObjectURL(blob);
         a.download = "ficha_customizada.pdf";
         a.click();
     } catch (err) {
-        alert("Erro técnico: " + err.message);
+        alert("Erro: " + err.message);
     }
 });
