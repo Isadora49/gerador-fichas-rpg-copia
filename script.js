@@ -1,5 +1,4 @@
-// Adicionado TextAlignment na desestruturação
-cons// Adicionado TextAlignment na desestruturação
+// Adicionamos TextAlignment à desestruturação
 const { PDFDocument, PDFName, PDFString, TextAlignment } = window.PDFLib || {};
 
 let pdfOriginalBytes = null;
@@ -87,7 +86,7 @@ function makeDraggable(el) {
     let offset = { x: 0, y: 0 };
 
     el.addEventListener('mousedown', (e) => {
-        if (e.offsetX > el.clientWidth - 15 && e.offsetY > el.clientHeight - 15) return;
+        if (e.offsetX > el.clientWidth - 15 && e.offsetY > el.clientHeight - 15) return; 
         isDragging = true;
         offset = {
             x: e.clientX - el.offsetLeft,
@@ -133,9 +132,10 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
                 }
             }
 
-            // CONFIGURAÇÃO DE TEXTO: TAMANHO 12 E CENTRALIZADO
+            // --- AQUI ESTÁ A MUDANÇA: FONTE 12 E CENTRALIZAÇÃO ---
             f.setFontSize(12);
             f.setAlignment(TextAlignment.Center);
+            // ---------------------------------------------------
 
             const elLeft = parseFloat(el.style.left);
             const elTop = parseFloat(el.style.top);
@@ -150,7 +150,6 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             f.addToPage(page, { x: pdfX, y: pdfY, width: pdfW, height: pdfH });
         }
 
-        // MOTOR DE CÁLCULO
         const scriptMotor = [
             'var escolha = this.getField("c1").value;',
             'var valBase1 = 0; var valBase2 = 0; var valBase3 = 0;',
@@ -205,7 +204,7 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
         const blob = new Blob([finalPdfBytes], { type: 'application/pdf' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = "ficha_final_centralizada.pdf";
+        a.download = "ficha_centralizada.pdf";
         a.click();
     } catch (err) {
         console.error(err);
