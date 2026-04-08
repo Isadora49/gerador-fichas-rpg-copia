@@ -2,7 +2,8 @@ const { PDFDocument, PDFName, PDFString } = window.PDFLib || {};
 
 let pdfOriginalBytes = null;
 let clicks = [];
-let isAdjusting = false; // Bloqueia novos cliques enquanto ajusta um campo
+let isDragging = false;
+let startX, startY;
 
 const labels = [
     "C1 (Lista Base)", "C2 (Nível 1)", "C3 (Dado 1)", "C4 (Total 1)", 
@@ -26,9 +27,8 @@ document.getElementById('uploadPdf').addEventListener('change', async (e) => {
     if (!file) return;
     try {
         const arrayBuffer = await file.arrayBuffer();
-        pdfOriginalBytes = arrayBuffer.slice(0); 
-        const previewBytes = arrayBuffer.slice(0);
-        const loadingTask = pdfjsLib.getDocument({ data: previewBytes });
+        pdfOriginalBytes = arrayBuffer.slice(0);
+        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer.slice(0) });
         const pdf = await loadingTask.promise;
         const page = await pdf.getPage(1);
         const viewport = page.getViewport({ scale: 1.5 });
@@ -37,88 +37,85 @@ document.getElementById('uploadPdf').addEventListener('change', async (e) => {
         canvas.height = viewport.height;
         canvas.width = viewport.width;
         await page.render({ canvasContext: context, viewport: viewport }).promise;
+        
         document.querySelectorAll('.marker').forEach(m => m.remove());
         clicks = [];
-        isAdjusting = false;
-        document.getElementById('status').innerText = "Clique para posicionar: " + labels[0];
+        document.getElementById('status').innerText = "Arraste para criar: " + labels[0];
         document.getElementById('btnDownload').disabled = true;
     } catch (err) {
         alert("Erro no PDF: " + err.message);
     }
 });
 
-// LOGICA DE MARCAÇÃO E REDIMENSIONAMENTO
-document.getElementById('pdf-canvas').addEventListener('click', (e) => {
-    if (clicks.length >= 43 || !pdfOriginalBytes || isAdjusting) return;
+// LÓGICA DE DESENHO DINÂMICO COM MOUSE
+const canvas = document.getElementById('pdf-canvas');
+const selectionRect = document.getElementById('selection-rect');
 
-    isAdjusting = true;
-    const rect = e.target.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+canvas.addEventListener('mousedown', (e) => {
+    if (clicks.length >= 43 || !pdfOriginalBytes) return;
+    isDragging = true;
+    const rect = canvas.getBoundingClientRect();
+    startX = e.clientX - rect.left;
+    startY = e.clientY - rect.top;
 
-    // Criar o elemento visual de ajuste
-    const marker = document.createElement('div');
-    marker.className = 'marker';
-    marker.style.left = e.pageX + 'px';
-    marker.style.top = e.pageY + 'px';
-    marker.style.width = '60px'; // Tamanho inicial padrão
-    marker.style.height = '25px';
-    marker.style.position = 'absolute';
-    marker.style.background = 'rgba(231, 76, 60, 0.7)';
-    marker.style.border = '2px dashed white';
-    marker.style.resize = 'both'; // PERMITE REDIMENSIONAR COM O MOUSE
-    marker.style.overflow = 'hidden';
-    marker.style.zIndex = "1000";
-    marker.style.display = 'flex';
-    marker.style.flexDirection = 'column';
-    marker.style.justifyContent = 'space-between';
-
-    const info = document.createElement('span');
-    info.style.fontSize = '9px';
-    info.style.pointerEvents = 'none';
-    info.innerText = labels[clicks.length];
-    
-    const confirmBtn = document.createElement('button');
-    confirmBtn.innerText = 'OK';
-    confirmBtn.style.fontSize = '9px';
-    confirmBtn.style.cursor = 'pointer';
-    confirmBtn.style.background = '#27ae60';
-    confirmBtn.style.border = 'none';
-    confirmBtn.style.color = 'white';
-
-    confirmBtn.onclick = (event) => {
-        event.stopPropagation();
-        const finalW = marker.offsetWidth;
-        const finalH = marker.offsetHeight;
-
-        clicks.push({ 
-            x, y, 
-            w: rect.width, 
-            h: rect.height,
-            fieldW: finalW,
-            fieldH: finalH 
-        });
-
-        marker.style.resize = 'none';
-        marker.style.background = '#e74c3c';
-        marker.style.border = 'none';
-        confirmBtn.remove();
-        isAdjusting = false;
-
-        if (clicks.length === 43) {
-            document.getElementById('status').innerText = "Pronto para baixar!";
-            document.getElementById('btnDownload').disabled = false;
-        } else {
-            document.getElementById('status').innerText = "Próximo: " + labels[clicks.length];
-        }
-    };
-
-    marker.appendChild(info);
-    marker.appendChild(confirmBtn);
-    document.body.appendChild(marker);
+    selectionRect.style.display = 'block';
+    selectionRect.style.left = e.pageX + 'px';
+    selectionRect.style.top = e.pageY + 'px';
+    selectionRect.style.width = '0px';
+    selectionRect.style.height = '0px';
 });
 
-// DOWNLOAD COM TAMANHOS DINÂMICOS
+window.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    const currentX = e.pageX;
+    const currentY = e.pageY;
+
+    const width = currentX - (startX + canvas.getBoundingClientRect().left + window.scrollX);
+    const height = currentY - (startY + canvas.getBoundingClientRect().top + window.scrollY);
+
+    selectionRect.style.width = Math.abs(width) + 'px';
+    selectionRect.style.height = Math.abs(height) + 'px';
+    if (width < 0) selectionRect.style.left = currentX + 'px';
+    if (height < 0) selectionRect.style.top = currentY + 'px';
+});
+
+window.addEventListener('mouseup', (e) => {
+    if (!isDragging) return;
+    isDragging = false;
+    selectionRect.style.display = 'none';
+
+    const rect = canvas.getBoundingClientRect();
+    const finalX = e.clientX - rect.left;
+    const finalY = e.clientY - rect.top;
+
+    // Calcula largura e altura finais
+    const w = Math.max(Math.abs(finalX - startX), 10); // Mínimo 10px
+    const h = Math.max(Math.abs(finalY - startY), 10);
+    const x = Math.min(startX, finalX);
+    const y = Math.min(startY, finalY);
+
+    // Salva o clique com dimensões personalizadas
+    clicks.push({ x, y, w: rect.width, h: rect.height, fieldW: w, fieldH: h });
+
+    // Cria o marcador visual proporcional ao desenho
+    const marker = document.createElement('div');
+    marker.className = 'marker';
+    marker.style.left = (x + rect.left + window.scrollX) + 'px';
+    marker.style.top = (y + rect.top + window.scrollY) + 'px';
+    marker.style.width = w + 'px';
+    marker.style.height = h + 'px';
+    marker.innerText = labels[clicks.length - 1];
+    document.body.appendChild(marker);
+
+    if (clicks.length === 43) {
+        document.getElementById('status').innerText = "Pronto!";
+        document.getElementById('btnDownload').disabled = false;
+    } else {
+        document.getElementById('status').innerText = "Arraste para criar: " + labels[clicks.length];
+    }
+});
+
+// LOGICA E DOWNLOAD
 document.getElementById('btnDownload').addEventListener('click', async () => {
     try {
         const pdfDoc = await PDFDocument.load(pdfOriginalBytes.slice(0));
@@ -132,12 +129,11 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             if (i === 6) return 'res2';
             return `c${i+1}`;
         });
-        
-        const fields = [];
 
         for (let i = 0; i < 43; i++) {
             const pos = clicks[i];
             let f;
+
             if (i === 0) {
                 f = form.createDropdown(fieldNames[i]);
                 f.addOptions(['A', 'B', 'C']);
@@ -152,20 +148,21 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
                 }
             }
 
+            // Mapeamento proporcional para o tamanho real do PDF
             const pdfX = (pos.x * width) / pos.w;
-            // Ajuste para o PDF-Lib (Y começa de baixo e compensamos a altura do campo)
             const pdfY = height - ((pos.y * height) / pos.h);
+            const pdfW = (pos.fieldW * width) / pos.w;
+            const pdfH = (pos.fieldH * height) / pos.h;
 
             f.addToPage(page, { 
                 x: pdfX, 
-                y: pdfY - pos.fieldH, 
-                width: pos.fieldW, 
-                height: pos.fieldH 
+                y: pdfY - pdfH, 
+                width: pdfW, 
+                height: pdfH 
             });
-            fields.push(f);
         }
 
-        // MOTOR DE CÁLCULO (Inalterado)
+        // MOTOR DE CÁLCULO (Omitido para brevidade, mas deve ser colado o mesmo script anterior aqui)
         const scriptMotor = [
             'var escolha = this.getField("c1").value;',
             'var valBase1 = 0; var valBase2 = 0; var valBase3 = 0;',
@@ -210,11 +207,6 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             JS: PDFString.of(scriptMotor)
         });
 
-        const triggerIndices = [0, 1, 4, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34]; 
-        triggerIndices.forEach(idx => {
-            fields[idx].acroField.dict.set(PDFName.of('AA'), docContext.obj({ K: action, V: action }));
-        });
-
         const acroForm = pdfDoc.catalog.get(PDFName.of('AcroForm'));
         if (acroForm) {
             const acroFormDict = docContext.lookup(acroForm);
@@ -226,9 +218,9 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = "ficha_ajustada.pdf";
+        a.download = "ficha_RPG_editavel.pdf";
         a.click();
     } catch (err) {
-        alert("Erro: " + err.message);
+        alert("Erro técnico: " + err.message);
     }
 });
