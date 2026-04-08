@@ -47,7 +47,7 @@ document.getElementById('uploadPdf').addEventListener('change', async (e) => {
     }
 });
 
-// CRIAÇÃO DO MARCADOR
+// CRIAÇÃO DO MARCADOR ARRASTÁVEL
 canvas.addEventListener('click', (e) => {
     if (currentStep >= 43 || !pdfOriginalBytes) return;
 
@@ -132,14 +132,10 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
                 }
             }
 
-            // --- NOVO: Configuração de Fonte e Alinhamento ---
-            // i=3 (C4), i=6 (C7), i=7 (C8). Se não for um deles, aplica estilo.
-            if (![3, 6, 7].includes(i)) {
-                f.setFontSize(12);
-                f.setAlignment(TextAlignment.Center);
-            }
+            // CONFIGURAÇÃO DE TEXTO: TAMANHO 12 E CENTRALIZADO
+            f.setFontSize(12);
+            f.setAlignment(TextAlignment.Center);
 
-            const rect = canvas.getBoundingClientRect();
             const elLeft = parseFloat(el.style.left);
             const elTop = parseFloat(el.style.top);
             const elW = el.offsetWidth;
@@ -153,7 +149,7 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             f.addToPage(page, { x: pdfX, y: pdfY, width: pdfW, height: pdfH });
         }
 
-        // --- MOTOR DE CÁLCULO ---
+        // MOTOR DE CÁLCULO
         const scriptMotor = [
             'var escolha = this.getField("c1").value;',
             'var valBase1 = 0; var valBase2 = 0; var valBase3 = 0;',
@@ -208,7 +204,7 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
         const blob = new Blob([finalPdfBytes], { type: 'application/pdf' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = "ficha_RPG_formatada.pdf";
+        a.download = "ficha_final_centralizada.pdf";
         a.click();
     } catch (err) {
         console.error(err);
