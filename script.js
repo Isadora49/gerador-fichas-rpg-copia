@@ -3,7 +3,6 @@ const { PDFDocument, PDFName, PDFString } = window.PDFLib || {};
 let pdfOriginalBytes = null; 
 let clicks = [];
 
-// 1. RÓTULOS (Total 43)
 const labels = [
     "C1 (Lista Base)", "C2 (Nível 1)", "C3 (Dado 1)", "C4 (Total 1)", 
     "C5 (Nível 2)", "C6 (Dado 2)", "C7 (Total 2)", "C8 (Total 3)",
@@ -19,11 +18,6 @@ const labels = [
 ];
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-
-// --- CONFIGURAÇÃO DE TAMANHO VIA INTERFACE ---
-// Certifique-se de ter esses IDs no seu HTML ou use os valores padrão abaixo
-const getWidthInput = () => parseInt(document.getElementById('fieldWidth')?.value) || 60;
-const getHeightInput = () => parseInt(document.getElementById('fieldHeight')?.value) || 20;
 
 // CARREGAMENTO
 document.getElementById('uploadPdf').addEventListener('change', async (e) => {
@@ -55,20 +49,21 @@ document.getElementById('uploadPdf').addEventListener('change', async (e) => {
 document.getElementById('pdf-canvas').addEventListener('click', (e) => {
     if (clicks.length >= 43 || !pdfOriginalBytes) return;
     
+    // Captura o tamanho desejado dos inputs no momento do clique
+    const customW = parseInt(document.getElementById('fieldWidth').value) || 60;
+    const customH = parseInt(document.getElementById('fieldHeight').value) || 20;
+
     const rect = e.target.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    
-    // Captura o tamanho definido nos inputs no momento do clique
-    const currentW = getWidthInput();
-    const currentH = getHeightInput();
 
+    // Salvamos a posição E o tamanho definido para este campo específico
     clicks.push({ 
         x, y, 
         canvasW: rect.width, 
         canvasH: rect.height,
-        fieldW: currentW, 
-        fieldH: currentH 
+        fieldW: customW,
+        fieldH: customH
     });
     
     const marker = document.createElement('div');
@@ -76,31 +71,27 @@ document.getElementById('pdf-canvas').addEventListener('click', (e) => {
     marker.style.left = e.pageX + 'px';
     marker.style.top = e.pageY + 'px';
     marker.style.position = 'absolute';
-    marker.style.background = 'rgba(231, 76, 60, 0.7)';
-    marker.style.border = '1px solid #c0392b';
+    marker.style.background = '#e74c3c';
     marker.style.color = 'white';
-    marker.style.fontSize = '10px';
-    marker.style.padding = '2px';
-    marker.style.borderRadius = '2px';
-    marker.style.pointerEvents = 'none'; // Não atrapalha cliques futuros
+    marker.style.padding = '4px';
+    marker.style.borderRadius = '4px';
     marker.style.zIndex = "100";
+    marker.style.fontSize = "10px";
+    marker.style.pointerEvents = "none"; // Não atrapalha cliques futuros
     
-    // O marcador visual no navegador agora reflete o tamanho que será no PDF
-    marker.style.width = currentW + 'px';
-    marker.style.height = currentH + 'px';
-    
-    marker.innerText = labels[clicks.length - 1];
+    // Mostra o rótulo e o tamanho escolhido no marcador para conferência
+    marker.innerText = `${labels[clicks.length - 1]} (${customW}x${customH})`;
     document.body.appendChild(marker);
     
     if (clicks.length === 43) {
         document.getElementById('status').innerText = "Pronto!";
         document.getElementById('btnDownload').disabled = false;
     } else {
-        document.getElementById('status').innerText = "Próximo: " + labels[clicks.length];
+        document.getElementById('status').innerText = "Clique para: " + labels[clicks.length];
     }
 });
 
-// DOWNLOAD E GERAÇÃO
+// LOGICA E DOWNLOAD
 document.getElementById('btnDownload').addEventListener('click', async () => {
     try {
         const pdfDoc = await PDFDocument.load(pdfOriginalBytes.slice(0));
@@ -127,45 +118,69 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
                 f.select('A');
             } else {
                 f = form.createTextField(fieldNames[i]);
+                
                 if (i < 36) {
                     const dadosIndices = [2, 5, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35];
                     f.setText(dadosIndices.includes(i) ? "1d4" : "0");
                 } else if (i >= 40) {
-                    f.enableMultiline(); // Campos 41, 42, 43
+                    f.enableMultiline(); // C41, C42, C43
                     f.setText("");
                 } else {
                     f.setText(""); 
                 }
             }
 
-            // Cálculo de posição proporcional
+            // Cálculo da posição proporcional
             const pdfX = (pos.x * width) / pos.canvasW;
             const pdfY = height - ((pos.y * height) / pos.canvasH);
-
-            // Usa o tamanho (W e H) capturado no momento do clique
+            
+            // USA O TAMANHO SALVO NO CLIQUE
             f.addToPage(page, { 
                 x: pdfX, 
-                y: pdfY - pos.fieldH, // Ajuste para o campo crescer para cima a partir do ponto
+                y: pdfY - (pos.fieldH / 2), // Centraliza o campo no clique
                 width: pos.fieldW, 
                 height: pos.fieldH 
             });
             fields.push(f);
         }
 
-        // --- MOTOR DE CÁLCULO ---
+        // --- MOTOR DE CÁLCULO (Inalterado) ---
         const scriptMotor = [
             'var escolha = this.getField("c1").value;',
-            'var vB1=0, vB2=0, vB3=0;',
-            'if(escolha=="A"){vB1=8;vB2=2;vB3=2}else if(escolha=="B"){vB1=2;vB2=4;vB3=2}else if(escolha=="C"){vB1=4;vB2=4;vB3=2}',
-            'function gD(n){n=Number(n)||0;if(n>=51)return "1d100";if(n>=27)return "1d50";if(n>=26)return "1d20";if(n>=21)return "1d12";if(n>=16)return "1d10";if(n>=11)return "1d8";if(n>=6)return "1d6";return "1d4"}',
-            'var n1=Number(this.getField("c2").value)||0; this.getField("c3").value=gD(n1);',
-            'var d1=(n1>=51)?100:(n1>=27)?50:(n1>=26)?20:(n1>=21)?12:(n1>=16)?10:(n1>=11)?8:(n1>=6)?6:4;',
-            'this.getField("res").value=(vB1*n1)+d1; this.getField("c8").value=(vB3*n1)+d1;',
-            'var n2=Number(this.getField("c5").value)||0; this.getField("c6").value=gD(n2);',
-            'var d2=(n2>=51)?100:(n2>=27)?50:(n2>=26)?20:(n2>=21)?12:(n2>=16)?10:(n2>=11)?8:(n2>=6)?6:4;',
-            'this.getField("res2").value=(vB2*n2)+d2;',
-            // Loops de automação compactados para evitar quebra
-            'for(var i=9;i<=35;i+=2){ if(i==7)continue; this.getField("c"+(i+1)).value=gD(this.getField("c"+i).value); }'
+            'var valBase1 = 0; var valBase2 = 0; var valBase3 = 0;',
+            'if (escolha == "A") { valBase1 = 8; valBase2 = 2; valBase3 = 2; }',
+            'else if (escolha == "B") { valBase1 = 2; valBase2 = 4; valBase3 = 2; }',
+            'else if (escolha == "C") { valBase1 = 4; valBase2 = 4; valBase3 = 2; }',
+            'function getDado(nivel) {',
+            '  nivel = Number(nivel) || 0;',
+            '  if (nivel >= 51) return "1d100"; if (nivel >= 27) return "1d50";',
+            '  if (nivel >= 26) return "1d20"; if (nivel >= 21) return "1d12";',
+            '  if (nivel >= 16) return "1d10"; if (nivel >= 11) return "1d8";',
+            '  if (nivel >= 6) return "1d6"; return "1d4";',
+            '}',
+            'var n1 = Number(this.getField("c2").value) || 0;',
+            'this.getField("c3").value = getDado(n1);',
+            'var d1N = (n1 >= 51)?100:(n1 >= 27)?50:(n1 >= 26)?20:(n1 >= 21)?12:(n1 >= 16)?10:(n1 >= 11)?8:(n1 >= 6)?6:4;',
+            'this.getField("res").value = (valBase1 * n1) + d1N;',
+            'this.getField("c8").value = (valBase3 * n1) + d1N;',
+            'var n2 = Number(this.getField("c5").value) || 0;',
+            'this.getField("c6").value = getDado(n2);',
+            'var d2N = (n2 >= 51)?100:(n2 >= 27)?50:(n2 >= 26)?20:(n2 >= 21)?12:(n2 >= 16)?10:(n2 >= 11)?8:(n2 >= 6)?6:4;',
+            'this.getField("res2").value = (valBase2 * n2) + d2N;',
+            'this.getField("c10").value = getDado(this.getField("c9").value);',
+            'this.getField("c12").value = getDado(this.getField("c11").value);',
+            'this.getField("c14").value = getDado(this.getField("c13").value);',
+            'this.getField("c16").value = getDado(this.getField("c15").value);',
+            'this.getField("c18").value = getDado(this.getField("c17").value);',
+            'this.getField("c20").value = getDado(this.getField("c19").value);',
+            'this.getField("c22").value = getDado(this.getField("c21").value);',
+            'this.getField("c24").value = getDado(this.getField("c23").value);',
+            'this.getField("c26").value = getDado(this.getField("c25").value);',
+            'this.getField("c28").value = getDado(this.getField("c27").value);',
+            'this.getField("c30").value = getDado(this.getField("c29").value);',
+            'this.getField("c32").value = getDado(this.getField("c31").value);',
+            'this.getField("c34").value = getDado(this.getField("c33").value);',
+            'this.getField("c36").value = getDado(this.getField("c35").value);'
         ].join('\n');
 
         const action = docContext.obj({
@@ -174,21 +189,23 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             JS: PDFString.of(scriptMotor)
         });
 
-        const triggers = [0, 1, 4, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34]; 
-        triggers.forEach(idx => {
+        const triggerIndices = [0, 1, 4, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34]; 
+        triggerIndices.forEach(idx => {
             fields[idx].acroField.dict.set(PDFName.of('AA'), docContext.obj({ K: action, V: action }));
         });
 
         const acroForm = pdfDoc.catalog.get(PDFName.of('AcroForm'));
         if (acroForm) {
-            docContext.lookup(acroForm).set(PDFName.of('NeedAppearances'), docContext.obj(true));
+            const acroFormDict = docContext.lookup(acroForm);
+            acroFormDict.set(PDFName.of('NeedAppearances'), docContext.obj(true));
         }
 
         const finalPdfBytes = await pdfDoc.save();
         const blob = new Blob([finalPdfBytes], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = "ficha_RPG_personalizada.pdf";
+        a.href = url;
+        a.download = "ficha_customizada.pdf";
         a.click();
     } catch (err) {
         alert("Erro técnico: " + err.message);
