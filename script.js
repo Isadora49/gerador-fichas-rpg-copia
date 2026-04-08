@@ -74,7 +74,7 @@ canvas.addEventListener('click', (e) => {
 
     currentStep++;
     if (currentStep === 43) {
-        document.getElementById('status').innerText = "Pronto para baixar!";
+        document.getElementById('status').innerText = "Todos os campos posicionados!";
         document.getElementById('btnDownload').disabled = false;
     } else {
         document.getElementById('status').innerText = "Posicione: " + labels[currentStep];
@@ -84,16 +84,22 @@ canvas.addEventListener('click', (e) => {
 function makeDraggable(el) {
     let isDragging = false;
     let offset = { x: 0, y: 0 };
+
     el.addEventListener('mousedown', (e) => {
         if (e.offsetX > el.clientWidth - 15 && e.offsetY > el.clientHeight - 15) return; 
         isDragging = true;
-        offset = { x: e.clientX - el.offsetLeft, y: e.clientY - el.offsetTop };
+        offset = {
+            x: e.clientX - el.offsetLeft,
+            y: e.clientY - el.offsetTop
+        };
     });
+
     document.addEventListener('mousemove', (e) => {
         if (!isDragging) return;
         el.style.left = (e.clientX - offset.x) + 'px';
         el.style.top = (e.clientY - offset.y) + 'px';
     });
+
     document.addEventListener('mouseup', () => { isDragging = false; });
 }
 
@@ -113,10 +119,15 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             
             let f;
             if (i === 0) {
+                // CORREÇÃO AQUI: As opções precisam combinar com o motor de cálculo!
                 f = form.createDropdown(name);
-                // Opções corrigidas para bater com seu scriptMotor
-                f.addOptions(['', 'Tank', 'Hibrido', 'Assassino', 'Destruidor', 'Arcano', 'Mentalista', 'Vitalista', 'Invocador', 'Elementalista']);
-                f.select('');
+                const opcoesClasses = [
+                    ' ', 'Tank', 'Hibrido', 'Assassino', 'Destruidor', 
+                    'Arcano', 'Mentalista', 'Vitalista', 'Invocador', 'Elementalista'
+                ];
+                f.addOptions(opcoesClasses);
+                f.select(' '); // Seleciona o vazio por padrão
+                
             } else {
                 f = form.createTextField(name);
                 if (i < 36) {
@@ -125,10 +136,11 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
                 } else if (i >= 40) {
                     f.enableMultiline();
                 }
-            }
 
-            f.setFontSize(12);
-            f.setAlignment(TextAlignment.Center);
+                // CORREÇÃO DO ERRO: Aplica formatação APENAS nos TextFields
+                f.setFontSize(12);
+                f.setAlignment(TextAlignment.Center);
+            }
 
             const elLeft = parseFloat(el.style.left);
             const elTop = parseFloat(el.style.top);
@@ -146,7 +158,7 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
         const scriptMotor = [
             'var escolha = this.getField("c1").value;',
             'var valBase1 = 0; var valBase2 = 0; var valBase3 = 0;',
-            'if (escolha == "") { valBase1 = 0; valBase2 = 0; valBase3 = 0; }',
+            'if (escolha == " " || escolha == "") { valBase1 = 0; valBase2 = 0; valBase3 = 0; }',
             'else if (escolha == "Tank") { valBase1 = 8; valBase2 = 2; valBase3 = 2; }',
             'else if (escolha == "Hibrido") { valBase1 = 4; valBase2 = 2; valBase3 = 4; }',
             'else if (escolha == "Assassino") { valBase1 = 2; valBase2 = 2; valBase3 = 8; }',
@@ -200,15 +212,11 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             allFields[idx].acroField.dict.set(PDFName.of('AA'), pdfDoc.context.obj({ K: action, V: action }));
         });
 
-        // --- CORREÇÃO DO ERRO /DA ---
-        // Força a atualização da aparência de todos os campos antes de salvar
-        form.updateRawAppearances(); 
-        
         const finalPdfBytes = await pdfDoc.save();
         const blob = new Blob([finalPdfBytes], { type: 'application/pdf' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = "ficha_RPG_corrigida.pdf";
+        a.download = "ficha_centralizada.pdf";
         a.click();
     } catch (err) {
         console.error(err);
