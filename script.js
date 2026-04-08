@@ -3,6 +3,7 @@ const { PDFDocument, PDFName, PDFString } = window.PDFLib || {};
 let pdfOriginalBytes = null; 
 let clicks = [];
 
+// 1. RÓTULOS EXPANDIDOS (Total 43)
 const labels = [
     "C1 (Lista Base)", "C2 (Nível 1)", "C3 (Dado 1)", "C4 (Total 1)", 
     "C5 (Nível 2)", "C6 (Dado 2)", "C7 (Total 2)", "C8 (Total 3)",
@@ -17,6 +18,7 @@ const labels = [
     "C41 (Multi-linha 1)", "C42 (Multi-linha 2)", "C43 (Multi-linha 3)"
 ];
 
+const CANVAS_SCALE = 1.5; // Escala usada na renderização
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
 // CARREGAMENTO
@@ -30,7 +32,7 @@ document.getElementById('uploadPdf').addEventListener('change', async (e) => {
         const loadingTask = pdfjsLib.getDocument({ data: previewBytes });
         const pdf = await loadingTask.promise;
         const page = await pdf.getPage(1);
-        const viewport = page.getViewport({ scale: 1.5 });
+        const viewport = page.getViewport({ scale: CANVAS_SCALE });
         const canvas = document.getElementById('pdf-canvas');
         const context = canvas.getContext('2d');
         canvas.height = viewport.height;
@@ -45,60 +47,72 @@ document.getElementById('uploadPdf').addEventListener('change', async (e) => {
     }
 });
 
-// MARCAÇÃO COM VISUALIZAÇÃO DE TAMANHO REAL
+// MARCAÇÃO COM VISUALIZAÇÃO DE TAMANHO
 document.getElementById('pdf-canvas').addEventListener('click', (e) => {
     if (clicks.length >= 43 || !pdfOriginalBytes) return;
-
-    // Pega o tamanho definido nos inputs do site
-    const currentW = parseInt(document.getElementById('fieldWidth').value) || 60;
-    const currentH = parseInt(document.getElementById('fieldHeight').value) || 20;
+    
+    // Pega os valores dos inputs criados no HTML
+    const widthInput = document.getElementById('fieldWidth');
+    const heightInput = document.getElementById('fieldHeight');
+    const customW = widthInput ? parseInt(widthInput.value) || 60 : 60;
+    const customH = heightInput ? parseInt(heightInput.value) || 20 : 20;
 
     const rect = e.target.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-
-    // Salva a posição e o tamanho escolhido para este clique específico
+    
+    // Salva a posição e os tamanhos customizados no momento do clique
     clicks.push({ 
         x, y, 
-        wCanvas: rect.width, 
-        hCanvas: rect.height,
-        fW: currentW,
-        fH: currentH
+        canvasW: rect.width, 
+        canvasH: rect.height,
+        fieldW: customW,
+        fieldH: customH
     });
     
-    // Criar o marcador visual na tela
+    // CRIAÇÃO DO MARCADOR VISUAL
     const marker = document.createElement('div');
     marker.className = 'marker';
-    marker.style.left = e.pageX + 'px';
-    marker.style.top = e.pageY + 'px';
     
-    // Aplica o tamanho real no marcador visual (com borda para visualização)
-    marker.style.width = currentW + 'px';
-    marker.style.height = currentH + 'px';
-    marker.style.border = "1px solid yellow";
-    marker.style.background = 'rgba(231, 76, 60, 0.7)';
+    // Posicionamento base
     marker.style.position = 'absolute';
-    marker.style.color = 'white';
-    marker.style.display = 'flex';
-    marker.style.alignItems = 'center';
-    marker.style.justifyContent = 'center';
-    marker.style.fontSize = '9px';
-    marker.style.pointerEvents = 'none';
-    marker.style.transform = 'translate(-50%, -50%)'; // Centraliza o campo no clique
+    marker.style.left = e.pageX + 'px'; // O campo começará da esquerda para a direita no clique
+    marker.style.top = e.pageY + 'px';  // Posição Y do clique
+    marker.style.transform = 'translateY(-50%)'; // Centraliza a caixa no eixo Y (mouse no meio do campo)
+    
+    // Dimensionamento visual (multiplica pela escala do canvas para ficar proporcional na tela)
+    marker.style.width = (customW * CANVAS_SCALE) + 'px';
+    marker.style.height = (customH * CANVAS_SCALE) + 'px';
+    marker.style.boxSizing = 'border-box';
+    marker.style.border = '2px solid #e74c3c'; // Borda vermelha forte
+    marker.style.background = 'rgba(231, 76, 60, 0.3)'; // Fundo vermelho translúcido
+    marker.style.color = '#fff';
+    marker.style.textShadow = '1px 1px 2px #000'; // Sombra no texto para leitura
+    marker.style.padding = '2px';
+    marker.style.fontSize = '10px';
+    marker.style.pointerEvents = 'none'; // Impede que o marcador bloqueie cliques futuros
     marker.style.zIndex = "100";
+    marker.style.overflow = "hidden"; // Evita que o texto vaze da caixa
     
     marker.innerText = labels[clicks.length - 1];
     document.body.appendChild(marker);
     
+    // Atualização de Status
     if (clicks.length === 43) {
         document.getElementById('status').innerText = "Pronto!";
         document.getElementById('btnDownload').disabled = false;
     } else {
         document.getElementById('status').innerText = "Clique para: " + labels[clicks.length];
+        
+        // Sugere tamanho maior automaticamente ao chegar nos campos multilinhas (C41, C42, C43)
+        if (clicks.length >= 40 && widthInput && heightInput) {
+            widthInput.value = 120;
+            heightInput.value = 60;
+        }
     }
 });
 
-// GERAÇÃO DO PDF
+// LOGICA E DOWNLOAD
 document.getElementById('btnDownload').addEventListener('click', async () => {
     try {
         const pdfDoc = await PDFDocument.load(pdfOriginalBytes.slice(0));
@@ -116,38 +130,40 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
         const fields = [];
 
         for (let i = 0; i < 43; i++) {
-            const pos = clicks[i];
             let f;
-
             if (i === 0) {
                 f = form.createDropdown(fieldNames[i]);
                 f.addOptions(['A', 'B', 'C']);
                 f.select('A');
             } else {
                 f = form.createTextField(fieldNames[i]);
+                
                 if (i < 36) {
                     const dadosIndices = [2, 5, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35];
                     f.setText(dadosIndices.includes(i) ? "1d4" : "0");
                 } else if (i >= 40) {
                     f.enableMultiline();
+                    f.setText("");
+                } else {
+                    f.setText(""); 
                 }
             }
 
-            // Mapeamento proporcional para o PDF
-            const pdfX = (pos.x * width) / pos.wCanvas;
-            const pdfY = height - ((pos.y * height) / pos.hCanvas);
+            const pos = clicks[i];
+            const pdfX = (pos.x * width) / pos.canvasW;
+            const pdfY = height - ((pos.y * height) / pos.canvasH);
             
-            // Usa exatamente a largura e altura salva no momento do clique
+            // APLICANDO AS DIMENSÕES SALVAS NO CLIQUE
             f.addToPage(page, { 
-                x: pdfX - (pos.fW / 2), 
-                y: pdfY - (pos.fH / 2), 
-                width: pos.fW, 
-                height: pos.fH 
+                x: pdfX, 
+                y: pdfY - (pos.fieldH / 2), // Mantém o campo centralizado com o eixo Y do clique
+                width: pos.fieldW, 
+                height: pos.fieldH 
             });
             fields.push(f);
         }
 
-        // MOTOR DE CÁLCULO (Omitido aqui por brevidade, mas mantido o mesmo do seu código original)
+        // MOTOR DE CÁLCULO INTACTO
         const scriptMotor = [
             'var escolha = this.getField("c1").value;',
             'var valBase1 = 0; var valBase2 = 0; var valBase3 = 0;',
@@ -186,7 +202,12 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             'this.getField("c36").value = getDado(this.getField("c35").value);'
         ].join('\n');
 
-        const action = docContext.obj({ Type: 'Action', S: 'JavaScript', JS: PDFString.of(scriptMotor) });
+        const action = docContext.obj({
+            Type: 'Action',
+            S: 'JavaScript',
+            JS: PDFString.of(scriptMotor)
+        });
+
         const triggerIndices = [0, 1, 4, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34]; 
         triggerIndices.forEach(idx => {
             fields[idx].acroField.dict.set(PDFName.of('AA'), docContext.obj({ K: action, V: action }));
@@ -194,16 +215,18 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
 
         const acroForm = pdfDoc.catalog.get(PDFName.of('AcroForm'));
         if (acroForm) {
-            docContext.lookup(acroForm).set(PDFName.of('NeedAppearances'), docContext.obj(true));
+            const acroFormDict = docContext.lookup(acroForm);
+            acroFormDict.set(PDFName.of('NeedAppearances'), docContext.obj(true));
         }
 
         const finalPdfBytes = await pdfDoc.save();
         const blob = new Blob([finalPdfBytes], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = "ficha_customizada.pdf";
+        a.href = url;
+        a.download = "ficha_RPG_43_campos.pdf";
         a.click();
     } catch (err) {
-        alert("Erro: " + err.message);
+        alert("Erro técnico: " + err.message);
     }
 });
