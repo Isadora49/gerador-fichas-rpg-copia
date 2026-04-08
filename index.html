@@ -5,15 +5,38 @@
     <title>Editor de Fichas RPG v2.0</title>
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
-    <style>
-        body { font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; margin: 0; background: #1a1a1a; color: white; }
-        #toolbar { padding: 15px; background: #222; border-bottom: 2px solid #e74c3c; display: flex; gap: 15px; align-items: center; }
-        #viewer-container { flex: 1; overflow: auto; position: relative; display: flex; justify-content: center; background: #333; }
-        canvas { border: 1px solid #000; box-shadow: 0 0 20px rgba(0,0,0,0.5); cursor: crosshair; margin: 20px; }
-        button { background: #e74c3c; color: white; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; }
-        button:disabled { background: #555; cursor: not-allowed; }
-        .marker { position: absolute; background: rgba(231, 76, 60, 0.8); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; pointer-events: none; transform: translate(-50%, -50%); }
-    </style>
+   <style>
+    body { font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; margin: 0; background: #1a1a1a; color: white; overflow: hidden; }
+    #toolbar { padding: 15px; background: #222; border-bottom: 2px solid #e74c3c; display: flex; gap: 15px; align-items: center; z-index: 100; }
+    #viewer-container { flex: 1; overflow: auto; position: relative; background: #333; display: block; }
+    #canvas-wrapper { position: relative; margin: 20px auto; width: fit-content; }
+    canvas { border: 1px solid #000; box-shadow: 0 0 20px rgba(0,0,0,0.5); cursor: crosshair; display: block; }
+    button { background: #e74c3c; color: white; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; }
+    button:disabled { background: #555; cursor: not-allowed; }
+    
+    /* O "fantasma" que segue o mouse */
+    #field-preview {
+        position: absolute;
+        background: rgba(231, 76, 60, 0.4);
+        border: 2px dashed #e74c3c;
+        pointer-events: none;
+        display: none;
+        z-index: 50;
+    }
+
+    .marker { 
+        position: absolute; 
+        background: rgba(231, 76, 60, 0.9); 
+        color: white; 
+        padding: 2px 5px; 
+        border-radius: 3px; 
+        font-size: 11px; 
+        pointer-events: none; 
+        white-space: nowrap;
+        border: 1px solid white;
+    }
+    .info-box { font-size: 12px; color: #aaa; }
+</style>
 </head>
 <body>
 
