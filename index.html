@@ -6,6 +6,7 @@
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
    <style>
+    
     body { font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; margin: 0; background: #1a1a1a; color: white; overflow: hidden; }
     #toolbar { padding: 15px; background: #222; border-bottom: 2px solid #e74c3c; display: flex; gap: 15px; align-items: center; z-index: 100; }
     #viewer-container { flex: 1; overflow: auto; position: relative; background: #333; display: block; }
@@ -39,7 +40,12 @@
 </style>
 </head>
 <body>
-
+<div id="viewer-container">
+    <div id="canvas-wrapper">
+        <div id="field-preview"></div>
+        <canvas id="pdf-canvas"></canvas>
+    </div>
+</div>
 <div id="toolbar">
     <input type="file" id="uploadPdf" accept="application/pdf">
     <div id="status">Selecione um PDF</div>
