@@ -133,4 +133,71 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
         // MOTOR DE CÁLCULO (Inalterado até C36)
         const scriptMotor = [
             'var escolha = this.getField("c1").value;',
-            'var valBase1 = 0
+            'var valBase1 = 0; var valBase2 = 0; var valBase3 = 0;',
+            'if (escolha == "A") { valBase1 = 8; valBase2 = 2; valBase3 = 2; }',
+            'else if (escolha == "B") { valBase1 = 2; valBase2 = 4; valBase3 = 2; }',
+            'else if (escolha == "C") { valBase1 = 4; valBase2 = 4; valBase3 = 2; }',
+            'function getDado(nivel) {',
+            '  nivel = Number(nivel) || 0;',
+            '  if (nivel >= 51) return "1d100";',
+            '  if (nivel >= 27) return "1d50";',
+            '  if (nivel >= 26) return "1d20";',
+            '  if (nivel >= 21) return "1d12";',
+            '  if (nivel >= 16) return "1d10";',
+            '  if (nivel >= 11) return "1d8";',
+            '  if (nivel >= 6) return "1d6";',
+            '  return "1d4";',
+            '}',
+            'var n1 = Number(this.getField("c2").value) || 0;',
+            'this.getField("c3").value = getDado(n1);',
+            'var d1N = (n1 >= 51)?100:(n1 >= 27)?50:(n1 >= 26)?20:(n1 >= 21)?12:(n1 >= 16)?10:(n1 >= 11)?8:(n1 >= 6)?6:4;',
+            'this.getField("res").value = (valBase1 * n1) + d1N;',
+            'this.getField("c8").value = (valBase3 * n1) + d1N;',
+            'var n2 = Number(this.getField("c5").value) || 0;',
+            'this.getField("c6").value = getDado(n2);',
+            'var d2N = (n2 >= 51)?100:(n2 >= 27)?50:(n2 >= 26)?20:(n2 >= 21)?12:(n2 >= 16)?10:(n2 >= 11)?8:(n2 >= 6)?6:4;',
+            'this.getField("res2").value = (valBase2 * n2) + d2N;',
+            'this.getField("c10").value = getDado(this.getField("c9").value);',
+            'this.getField("c12").value = getDado(this.getField("c11").value);',
+            'this.getField("c14").value = getDado(this.getField("c13").value);',
+            'this.getField("c16").value = getDado(this.getField("c15").value);',
+            'this.getField("c18").value = getDado(this.getField("c17").value);',
+            'this.getField("c20").value = getDado(this.getField("c19").value);',
+            'this.getField("c22").value = getDado(this.getField("c21").value);',
+            'this.getField("c24").value = getDado(this.getField("c23").value);',
+            'this.getField("c26").value = getDado(this.getField("c25").value);',
+            'this.getField("c28").value = getDado(this.getField("c27").value);',
+            'this.getField("c30").value = getDado(this.getField("c29").value);',
+            'this.getField("c32").value = getDado(this.getField("c31").value);',
+            'this.getField("c34").value = getDado(this.getField("c33").value);',
+            'this.getField("c36").value = getDado(this.getField("c35").value);'
+        ].join('\n');
+
+        const action = docContext.obj({
+            Type: 'Action',
+            S: 'JavaScript',
+            JS: PDFString.of(scriptMotor)
+        });
+
+        const triggerIndices = [0, 1, 4, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34]; 
+        triggerIndices.forEach(idx => {
+            fields[idx].acroField.dict.set(PDFName.of('AA'), docContext.obj({ K: action, V: action }));
+        });
+
+        const acroForm = pdfDoc.catalog.get(PDFName.of('AcroForm'));
+        if (acroForm) {
+            const acroFormDict = docContext.lookup(acroForm);
+            acroFormDict.set(PDFName.of('NeedAppearances'), docContext.obj(true));
+        }
+
+        const finalPdfBytes = await pdfDoc.save();
+        const blob = new Blob([finalPdfBytes], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = "ficha_RPG_43_campos.pdf";
+        a.click();
+    } catch (err) {
+        alert("Erro técnico: " + err.message);
+    }
+});
