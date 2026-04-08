@@ -7,34 +7,23 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; margin: 0; background: #1a1a1a; color: white; }
-        #toolbar { padding: 15px; background: #222; border-bottom: 2px solid #e74c3c; display: flex; gap: 15px; align-items: center; flex-wrap: wrap; }
+        #toolbar { padding: 15px; background: #222; border-bottom: 2px solid #e74c3c; display: flex; gap: 15px; align-items: center; }
         #viewer-container { flex: 1; overflow: auto; position: relative; display: flex; justify-content: center; background: #333; }
         canvas { border: 1px solid #000; box-shadow: 0 0 20px rgba(0,0,0,0.5); cursor: crosshair; margin: 20px; }
         button { background: #e74c3c; color: white; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; }
         button:disabled { background: #555; cursor: not-allowed; }
-        
-        /* Estilo para os inputs de tamanho */
-        .config-group { display: flex; gap: 10px; align-items: center; background: #333; padding: 5px 15px; border-radius: 5px; border: 1px solid #444; }
-        input[type="number"] { width: 60px; background: #444; color: white; border: 1px solid #e74c3c; padding: 5px; border-radius: 3px; }
-        
-        .marker { position: absolute; background: rgba(231, 76, 60, 0.8); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; pointer-events: none; }
+        .marker { position: absolute; background: rgba(231, 76, 60, 0.8); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; pointer-events: none; transform: translate(-50%, -50%); }
     </style>
 </head>
 <body>
 
 <div id="toolbar">
     <input type="file" id="uploadPdf" accept="application/pdf">
-
-    <div class="config-group">
-        <label>Largura: <input type="number" id="fieldWidth" value="60"></label>
-        <label>Altura: <input type="number" id="fieldHeight" value="20"></label>
-    </div>
-
     <div id="status">Selecione um PDF</div>
     <button id="btnDownload" disabled>BAIXAR PDF CONFIGURADO</button>
 </div>
 
-<div id="viewer-container">
+<div id="viewer-container" id="container">
     <canvas id="pdf-canvas"></canvas>
 </div>
 
