@@ -1,4 +1,4 @@
-// 1. Adicionado TextAlignment à desestruturação
+// Adicionado TextAlignment na desestruturação
 const { PDFDocument, PDFName, PDFString, TextAlignment } = window.PDFLib || {};
 
 let pdfOriginalBytes = null;
@@ -58,7 +58,6 @@ canvas.addEventListener('click', (e) => {
     const marker = document.createElement('div');
     marker.className = 'marker';
     marker.id = `field-${currentStep}`;
-    
     const defaultW = (currentStep >= 40) ? 120 : 60;
     const defaultH = (currentStep >= 40) ? 60 : 20;
 
@@ -86,7 +85,7 @@ function makeDraggable(el) {
     let offset = { x: 0, y: 0 };
 
     el.addEventListener('mousedown', (e) => {
-        if (e.offsetX > el.clientWidth - 15 && e.offsetY > el.clientHeight - 15) return; 
+        if (e.offsetX > el.clientWidth - 15 && e.offsetY > el.clientHeight - 15) return;
         isDragging = true;
         offset = {
             x: e.clientX - el.offsetLeft,
@@ -111,9 +110,6 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
         const page = pdfDoc.getPage(0);
         const { width, height } = page.getSize();
 
-        // Lista de índices para ignorar a formatação (C4=3, C7=6, C8=7)
-        const excludedFromFormatting = [3, 6, 7];
-
         for (let i = 0; i < 43; i++) {
             const el = document.getElementById(`field-${i}`);
             if (!el) continue;
@@ -135,13 +131,11 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
                 }
             }
 
-            // --- APLICAÇÃO DA FORMATAÇÃO (Tamanho 12 e Centralizado) ---
-            if (!excludedFromFormatting.includes(i)) {
+            // --- LÓGICA DE FORMATAÇÃO SOLICITADA ---
+            // i=3 (C4), i=6 (C7), i=7 (C8) são excluídos da regra
+            if (i !== 3 && i !== 6 && i !== 7) {
                 f.setFontSize(12);
-                // setAlignment está disponível para TextFields
-                if (typeof f.setAlignment === 'function') {
-                    f.setAlignment(TextAlignment.Center);
-                }
+                f.setAlignment(TextAlignment.Center);
             }
 
             const elLeft = parseFloat(el.style.left);
@@ -212,7 +206,7 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
         const blob = new Blob([finalPdfBytes], { type: 'application/pdf' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = "ficha_interativa_formatada.pdf";
+        a.download = "ficha_interativa.pdf";
         a.click();
     } catch (err) {
         console.error(err);
