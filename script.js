@@ -140,7 +140,6 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
                 f.setFontSize(12);
 
                 // --- NOVA LÓGICA DE ALINHAMENTO ---
-                // Índices 36 (C37), 37 (C38), 40 (C41), 41 (C42), 42 (C43)
                 const indicesEsquerda = [36, 37, 40, 41, 42];
                 if (indicesEsquerda.includes(i)) {
                     f.setAlignment(TextAlignment.Left);
@@ -159,7 +158,14 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             const pdfW = (elW * width) / canvas.width;
             const pdfH = (elH * height) / canvas.height;
 
-            f.addToPage(page, { x: pdfX, y: pdfY, width: pdfW, height: pdfH });
+            // ADICIONAMOS borderWidth: 0 AQUI PARA GARANTIR TRANSPARÊNCIA DA BORDA
+            f.addToPage(page, { 
+                x: pdfX, 
+                y: pdfY, 
+                width: pdfW, 
+                height: pdfH,
+                borderWidth: 0 
+            });
         }
 
         // --- SCRIPT DO MOTOR ---
