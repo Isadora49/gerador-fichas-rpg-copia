@@ -1,4 +1,5 @@
-const { PDFDocument, PDFName, PDFString } = window.PDFLib || {};
+// 1. Adicionado TextAlignment à desestruturação
+const { PDFDocument, PDFName, PDFString, TextAlignment } = window.PDFLib || {};
 
 let pdfOriginalBytes = null;
 const labels = [
@@ -57,7 +58,7 @@ canvas.addEventListener('click', (e) => {
     const marker = document.createElement('div');
     marker.className = 'marker';
     marker.id = `field-${currentStep}`;
-    // Definindo tamanho padrão baseado no tipo
+    
     const defaultW = (currentStep >= 40) ? 120 : 60;
     const defaultH = (currentStep >= 40) ? 60 : 20;
 
@@ -80,13 +81,12 @@ canvas.addEventListener('click', (e) => {
     }
 });
 
-// FUNÇÃO PARA ARRASTAR ELEMENTOS
 function makeDraggable(el) {
     let isDragging = false;
     let offset = { x: 0, y: 0 };
 
     el.addEventListener('mousedown', (e) => {
-        if (e.offsetX > el.clientWidth - 15 && e.offsetY > el.clientHeight - 15) return; // Não arrasta se estiver redimensionando
+        if (e.offsetX > el.clientWidth - 15 && e.offsetY > el.clientHeight - 15) return; 
         isDragging = true;
         offset = {
             x: e.clientX - el.offsetLeft,
@@ -111,11 +111,13 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
         const page = pdfDoc.getPage(0);
         const { width, height } = page.getSize();
 
+        // Lista de índices para ignorar a formatação (C4=3, C7=6, C8=7)
+        const excludedFromFormatting = [3, 6, 7];
+
         for (let i = 0; i < 43; i++) {
             const el = document.getElementById(`field-${i}`);
             if (!el) continue;
 
-            // Nomes dos campos
             let name = (i === 3) ? 'res' : (i === 6) ? 'res2' : `c${i+1}`;
             
             let f;
@@ -133,15 +135,21 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
                 }
             }
 
-            // Converter coordenadas do HTML para o PDF
-            const rect = canvas.getBoundingClientRect();
+            // --- APLICAÇÃO DA FORMATAÇÃO (Tamanho 12 e Centralizado) ---
+            if (!excludedFromFormatting.includes(i)) {
+                f.setFontSize(12);
+                // setAlignment está disponível para TextFields
+                if (typeof f.setAlignment === 'function') {
+                    f.setAlignment(TextAlignment.Center);
+                }
+            }
+
             const elLeft = parseFloat(el.style.left);
             const elTop = parseFloat(el.style.top);
             const elW = el.offsetWidth;
             const elH = el.offsetHeight;
 
             const pdfX = (elLeft * width) / canvas.width;
-            // No PDF, o Y 0 é na BASE da página, no HTML é no TOPO.
             const pdfY = height - ((elTop * height) / canvas.height) - ((elH * height) / canvas.height);
             const pdfW = (elW * width) / canvas.width;
             const pdfH = (elH * height) / canvas.height;
@@ -149,7 +157,7 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             f.addToPage(page, { x: pdfX, y: pdfY, width: pdfW, height: pdfH });
         }
 
-        // MOTOR DE CÁLCULO (O mesmo que você já usa)
+        // MOTOR DE CÁLCULO
         const scriptMotor = [
             'var escolha = this.getField("c1").value;',
             'var valBase1 = 0; var valBase2 = 0; var valBase3 = 0;',
@@ -204,7 +212,7 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
         const blob = new Blob([finalPdfBytes], { type: 'application/pdf' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = "ficha_interativa.pdf";
+        a.download = "ficha_interativa_formatada.pdf";
         a.click();
     } catch (err) {
         console.error(err);
