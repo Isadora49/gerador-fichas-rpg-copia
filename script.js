@@ -1,4 +1,4 @@
-const { PDFDocument, PDFName, PDFString } = window.PDFLib || {};
+const { PDFDocument, PDFName, PDFString, PDFNumber } = window.PDFLib || {};
 
 let pdfOriginalBytes = null; 
 let clicks = [];
@@ -14,8 +14,8 @@ const labels = [
     "C25 (Nível 11)", "C26 (Dado 11)", "C27 (Nível 12)", "C28 (Dado 12)",
     "C29 (Nível 13)", "C30 (Dado 13)", "C31 (Nível 14)", "C32 (Dado 14)",
     "C33 (Nível 15)", "C34 (Dado 15)", "C35 (Nível 16)", "C36 (Dado 16)",
-    "C37 (Texto 1)", "C38 (Texto 2)", "C39 (Texto 3)", "C40 (Texto 4)",
-    "C41 (2 Linhas A)", "C42 (2 Linhas B)", "C43 (2 Linhas C)"
+    "C37 (Texto)", "C38 (Texto)", "C39 (Texto)", "C40 (Texto)",
+    "C41 (Multi-linha 1)", "C42 (Multi-linha 2)", "C43 (Multi-linha 3)"
 ];
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
@@ -46,7 +46,7 @@ document.getElementById('uploadPdf').addEventListener('change', async (e) => {
     }
 });
 
-// MARCAÇÃO (Limite atualizado para 43)
+// MARCAÇÃO (Limite para 43)
 document.getElementById('pdf-canvas').addEventListener('click', (e) => {
     if (clicks.length >= 43 || !pdfOriginalBytes) return;
     const rect = e.target.getBoundingClientRect();
@@ -68,4 +68,69 @@ document.getElementById('pdf-canvas').addEventListener('click', (e) => {
     document.body.appendChild(marker);
     
     if (clicks.length === 43) {
-        document.getElementById('status').innerText =
+        document.getElementById('status').innerText = "Pronto!";
+        document.getElementById('btnDownload').disabled = false;
+    } else {
+        document.getElementById('status').innerText = "Clique para: " + labels[clicks.length];
+    }
+});
+
+// LOGICA E DOWNLOAD
+document.getElementById('btnDownload').addEventListener('click', async () => {
+    try {
+        const pdfDoc = await PDFDocument.load(pdfOriginalBytes.slice(0));
+        const form = pdfDoc.getForm();
+        const page = pdfDoc.getPage(0);
+        const { width, height } = page.getSize();
+        const docContext = pdfDoc.context;
+
+        const fieldNames = Array.from({length: 43}, (_, i) => {
+            if (i === 3) return 'res';
+            if (i === 6) return 'res2';
+            return `c${i+1}`;
+        });
+        
+        const fields = [];
+
+        for (let i = 0; i < 43; i++) {
+            let f;
+            if (i === 0) {
+                f = form.createDropdown(fieldNames[i]);
+                f.addOptions(['A', 'B', 'C']);
+                f.select('A');
+            } else {
+                f = form.createTextField(fieldNames[i]);
+                
+                if (i < 36) {
+                    const dadosIndices = [2, 5, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35];
+                    f.setText(dadosIndices.includes(i) ? "1d4" : "0");
+                } else if (i >= 40) {
+                    // Lógica para Multi-linha (C41, C42, C43)
+                    f.enableMultiline();
+                    f.setText("");
+                } else {
+                    f.setText(""); 
+                }
+            }
+            
+            const pos = clicks[i];
+            const pdfX = (pos.x * width) / pos.w;
+            const pdfY = height - ((pos.y * height) / pos.h);
+            
+            // Para multi-linha (i >= 40), criamos uma caixa maior (ex: 120x60)
+            const boxWidth = i >= 40 ? 120 : 60;
+            const boxHeight = i >= 40 ? 60 : 20;
+
+            f.addToPage(page, { 
+                x: pdfX, 
+                y: pdfY - boxHeight + 10, 
+                width: boxWidth, 
+                height: boxHeight 
+            });
+            fields.push(f);
+        }
+
+        // MOTOR DE CÁLCULO (Inalterado até C36)
+        const scriptMotor = [
+            'var escolha = this.getField("c1").value;',
+            'var valBase1 = 0
