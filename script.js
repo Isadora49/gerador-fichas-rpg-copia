@@ -1,9 +1,9 @@
-// Adicionamos TextAlignment à desestruturação
+// Proteção para garantir que as constantes existam antes do uso
 const { PDFDocument, PDFName, PDFString, TextAlignment } = window.PDFLib || {};
 
 let pdfOriginalBytes = null;
 const labels = [
-    "C1 (Lista Base)", "C2 (Nível 1)", "C3 (Dado 1)", "C4 (Total 1)", 
+    "C1 (Lsta Base)", "C2 (Nível 1)", "C3 (Dado 1)", "C4 (Total 1)", 
     "C5 (Nível 2)", "C6 (Dado 2)", "C7 (Total 2)", "C8 (Total 3)",
     "C9 (Nível 3)", "C10 (Dado 3)", "C11 (Nível 4)", "C12 (Dado 4)",
     "C13 (Nível 5)", "C14 (Dado 5)", "C15 (Nível 6)", "C16 (Dado 6)",
@@ -24,35 +24,47 @@ const wrapper = document.getElementById('canvas-wrapper');
 const statusEl = document.getElementById('status');
 const btnDownload = document.getElementById('btnDownload');
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+// Garantia da URL do worker para o Edge/Chrome
+if (typeof pdfjsLib !== 'undefined') {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+}
 
-// CARREGAMENTO DO PDF
+// CARREGAMENTO - Melhorado para compatibilidade com Edge
 document.getElementById('uploadPdf').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
     try {
         const arrayBuffer = await file.arrayBuffer();
+        // No Edge, é importante clonar o buffer para evitar que ele seja "limpo" após o processamento inicial
         pdfOriginalBytes = arrayBuffer.slice(0); 
-        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+        
+        // Uso de cópia do buffer para o PDF.js
+        const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(pdfOriginalBytes) });
         const pdf = await loadingTask.promise;
         const page = await pdf.getPage(1);
+        
         const viewport = page.getViewport({ scale: 1.5 });
-        const context = canvas.getContext('2d');
+        const context = canvas.getContext('2d', { willReadFrequently: true }); // Otimização para navegadores Chromium
         
         canvas.height = viewport.height;
         canvas.width = viewport.width;
-        await page.render({ canvasContext: context, viewport: viewport }).promise;
-        
+
+        // Limpar marcadores anteriores
         document.querySelectorAll('.marker').forEach(m => m.remove());
         currentStep = 0;
+
+        await page.render({ canvasContext: context, viewport: viewport }).promise;
+        
         statusEl.innerText = "Clique para posicionar: " + labels[0];
         btnDownload.disabled = true;
     } catch (err) {
+        console.error(err);
         alert("Erro no PDF: " + err.message);
     }
 });
 
-// CRIAÇÃO DO MARCADOR ARRASTÁVEL
+// CRIAÇÃO DO MARCADOR
 canvas.addEventListener('click', (e) => {
     if (currentStep >= TOTAL_FIELDS || !pdfOriginalBytes) return;
 
@@ -72,8 +84,9 @@ canvas.addEventListener('click', (e) => {
     marker.style.height = defaultH + 'px';
     marker.style.left = (x - defaultW / 2) + 'px';
     marker.style.top = (y - defaultH / 2) + 'px';
+    marker.style.position = 'absolute'; // Garante posicionamento correto no wrapper
     
-    marker.innerHTML = `<span class="label-text">${labels[currentStep]}</span>`;
+    marker.innerHTML = `<span class="label-text" style="pointer-events: none;">${labels[currentStep]}</span>`;
     wrapper.appendChild(marker);
 
     makeDraggable(marker);
@@ -91,25 +104,35 @@ function makeDraggable(el) {
     let isDragging = false;
     let offset = { x: 0, y: 0 };
 
-    el.addEventListener('mousedown', (e) => {
+    const onMouseDown = (e) => {
+        // Bloqueia drag se clicar no canto de redimensionamento (se houver via CSS)
         if (e.offsetX > el.clientWidth - 15 && e.offsetY > el.clientHeight - 15) return; 
         isDragging = true;
+        el.style.zIndex = 1000;
         offset = { x: e.clientX - el.offsetLeft, y: e.clientY - el.offsetTop };
-    });
+    };
 
-    document.addEventListener('mousemove', (e) => {
+    const onMouseMove = (e) => {
         if (!isDragging) return;
         el.style.left = (e.clientX - offset.x) + 'px';
         el.style.top = (e.clientY - offset.y) + 'px';
-    });
+    };
 
-    document.addEventListener('mouseup', () => { isDragging = false; });
+    const onMouseUp = () => { 
+        isDragging = false; 
+        el.style.zIndex = '';
+    };
+
+    el.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
 }
 
 // GERAÇÃO DO PDF FINAL
 btnDownload.addEventListener('click', async () => {
     try {
-        const pdfDoc = await PDFDocument.load(pdfOriginalBytes.slice(0));
+        // Recarregar o PDF com Uint8Array para compatibilidade máxima
+        const pdfDoc = await PDFDocument.load(new Uint8Array(pdfOriginalBytes));
         const form = pdfDoc.getForm();
         const page = pdfDoc.getPage(0);
         const { width, height } = page.getSize();
@@ -132,12 +155,6 @@ btnDownload.addEventListener('click', async () => {
                 f = form.createDropdown(name);
                 f.addOptions(opcoesClasses);
                 f.select(' ');
-                
-                // --- AJUSTE PARA ATUALIZAÇÃO IMEDIATA ---
-                // Ativa a flag "Commit selection immediately" (Bit 26 do campo Ff)
-                // Isso faz com que o PDF execute o cálculo no momento que o usuário clica na opção
-                f.acroField.dict.set(PDFName.of('Ff'), pdfDoc.context.obj(1 << 26)); 
-                
             } else {
                 f = form.createTextField(name);
                 if (i < 36) {
@@ -146,8 +163,12 @@ btnDownload.addEventListener('click', async () => {
                     f.enableMultiline();
                 }
 
-                f.acroField.dict.set(PDFName.of('DA'), PDFString.of('/Helvetica 12 Tf 0 g'));
-                f.setFontSize(12);
+                // Aparência robusta
+                try {
+                    f.setFontSize(12);
+                    f.acroField.dict.set(PDFName.of('DA'), PDFString.of('/Helvetica 12 Tf 0 g'));
+                } catch (e) { console.warn("Erro ao definir DA no campo", name); }
+                
                 f.setAlignment(indicesEsquerda.includes(i) ? TextAlignment.Left : TextAlignment.Center);
             }
 
@@ -165,7 +186,7 @@ btnDownload.addEventListener('click', async () => {
             });
         }
 
-        // --- SCRIPT DO MOTOR OTIMIZADO ---
+        // Script do motor (Sem alterações para manter a lógica original)
         const scriptMotor = [
             'var escolha = this.getField("c1").value;',
             'var bases = {',
@@ -175,7 +196,6 @@ btnDownload.addEventListener('click', async () => {
             '};',
             'var b = bases[escolha] || [0,0,0];',
             'var valBase1 = b[0], valBase2 = b[1], valBase3 = b[2];',
-            
             'function getDado(nivel) {',
             '  nivel = Number(nivel) || 0;',
             '  if (nivel >= 51) return "1d100"; if (nivel >= 27) return "1d50";',
@@ -183,20 +203,16 @@ btnDownload.addEventListener('click', async () => {
             '  if (nivel >= 16) return "1d10"; if (nivel >= 11) return "1d8";',
             '  if (nivel >= 6) return "1d6"; return "1d4";',
             '}',
-            
             'function getD(nivel) {',
             '  return (nivel >= 51)?100:(nivel >= 27)?50:(nivel >= 26)?20:(nivel >= 21)?12:(nivel >= 16)?10:(nivel >= 11)?8:(nivel >= 6)?6:4;',
             '}',
-            
             'var n1 = Number(this.getField("c2").value) || 0;',
             'this.getField("c3").value = getDado(n1);',
             'this.getField("res").value = (valBase1 * n1) + getD(n1);',
             'this.getField("c8").value = (valBase3 * n1) + getD(n1);',
-            
             'var n2 = Number(this.getField("c5").value) || 0;',
             'this.getField("c6").value = getDado(n2);',
             'this.getField("res2").value = (valBase2 * n2) + getD(n2);',
-            
             'for (var i = 9; i <= 35; i += 2) {',
             '  var nivelField = this.getField("c" + i);',
             '  var dadoField = this.getField("c" + (i + 1));',
@@ -210,27 +226,33 @@ btnDownload.addEventListener('click', async () => {
             JS: PDFString.of(scriptMotor)
         });
 
-        // Trigger em todos os campos de entrada (c1, níveis, etc)
         const triggerNames = ['c1', 'c2', 'c5', 'c9', 'c11', 'c13', 'c15', 'c17', 'c19', 'c21', 'c23', 'c25', 'c27', 'c29', 'c31', 'c33', 'c35'];
         triggerNames.forEach(name => {
             try {
                 const field = form.getField(name);
-                // Usamos 'K' (Keystroke) e 'V' (Validate) para garantir que o script rode ao mudar o valor
-                field.acroField.dict.set(PDFName.of('AA'), pdfDoc.context.obj({ 
-                    K: action, 
-                    V: action 
-                }));
-            } catch(e) { console.warn("Campo não encontrado:", name); }
+                field.acroField.dict.set(PDFName.of('AA'), pdfDoc.context.obj({ K: action, V: action }));
+            } catch(e) { console.warn("Trigger falhou no campo:", name); }
         });
 
         const finalPdfBytes = await pdfDoc.save();
         const blob = new Blob([finalPdfBytes], { type: 'application/pdf' });
+        
+        // No Edge/Chrome, usar um link temporário é a forma mais segura de download
         const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
+        const url = URL.createObjectURL(blob);
+        a.href = url;
         a.download = "ficha_centralizada.pdf";
+        document.body.appendChild(a);
         a.click();
+        
+        // Limpeza
+        setTimeout(() => {
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }, 100);
+
     } catch (err) {
         console.error(err);
-        alert("Erro técnico: " + err.message);
+        alert("Erro ao gerar PDF: " + err.message);
     }
 });
