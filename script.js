@@ -3,7 +3,7 @@ const { PDFDocument, PDFName, PDFString, TextAlignment } = window.PDFLib || {};
 
 let pdfOriginalBytes = null;
 const labels = [
-    "C1 (Lsta Base)", "C2 (Nível 1)", "C3 (Dado 1)", "C4 (Total 1)", 
+    "C1 (Lista Base)", "C2 (Nível 1)", "C3 (Dado 1)", "C4 (Total 1)", 
     "C5 (Nível 2)", "C6 (Dado 2)", "C7 (Total 2)", "C8 (Total 3)",
     "C9 (Nível 3)", "C10 (Dado 3)", "C11 (Nível 4)", "C12 (Dado 4)",
     "C13 (Nível 5)", "C14 (Dado 5)", "C15 (Nível 6)", "C16 (Dado 6)",
@@ -26,7 +26,7 @@ const btnDownload = document.getElementById('btnDownload');
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-// CARREGAMENTO DO PDF
+// CARREGAMENTO
 document.getElementById('uploadPdf').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -52,7 +52,7 @@ document.getElementById('uploadPdf').addEventListener('change', async (e) => {
     }
 });
 
-// CRIAÇÃO DO MARCADOR
+// CRIAÇÃO DO MARCADOR ARRASTÁVEL
 canvas.addEventListener('click', (e) => {
     if (currentStep >= TOTAL_FIELDS || !pdfOriginalBytes) return;
 
@@ -90,20 +90,23 @@ canvas.addEventListener('click', (e) => {
 function makeDraggable(el) {
     let isDragging = false;
     let offset = { x: 0, y: 0 };
+
     el.addEventListener('mousedown', (e) => {
         if (e.offsetX > el.clientWidth - 15 && e.offsetY > el.clientHeight - 15) return; 
         isDragging = true;
         offset = { x: e.clientX - el.offsetLeft, y: e.clientY - el.offsetTop };
     });
+
     document.addEventListener('mousemove', (e) => {
         if (!isDragging) return;
         el.style.left = (e.clientX - offset.x) + 'px';
         el.style.top = (e.clientY - offset.y) + 'px';
     });
+
     document.addEventListener('mouseup', () => { isDragging = false; });
 }
 
-// GERAÇÃO DO PDF
+// GERAÇÃO DO PDF FINAL
 btnDownload.addEventListener('click', async () => {
     try {
         const pdfDoc = await PDFDocument.load(pdfOriginalBytes.slice(0));
@@ -136,6 +139,7 @@ btnDownload.addEventListener('click', async () => {
                 } else if (i >= 40 && i <= 42) {
                     f.enableMultiline();
                 }
+
                 f.acroField.dict.set(PDFName.of('DA'), PDFString.of('/Helvetica 12 Tf 0 g'));
                 f.setFontSize(12);
                 f.setAlignment(indicesEsquerda.includes(i) ? TextAlignment.Left : TextAlignment.Center);
@@ -155,10 +159,11 @@ btnDownload.addEventListener('click', async () => {
             });
         }
 
-        // --- SCRIPT DO MOTOR (AJUSTADO PARA EDGE) ---
+        // --- SCRIPT DO MOTOR OTIMIZADO PARA NAVEGADORES (EDGE/CHROME) ---
         const scriptMotor = [
-            'function calcularFicha() {',
-            '  var escolha = this.getField("c1").value;',
+            'try {',
+            '  var c1Field = this.getField("c1");',
+            '  var escolha = c1Field ? c1Field.value : " ";',
             '  var bases = {',
             '    "Tank": [8,2,2], "Hibrido": [4,2,4], "Assassino": [2,2,8],',
             '    "Destruidor": [2,4,2], "Arcano": [2,4,2], "Mentalista": [2,4,2],',
@@ -168,60 +173,21 @@ btnDownload.addEventListener('click', async () => {
             '  var valBase1 = b[0], valBase2 = b[1], valBase3 = b[2];',
             '  ',
             '  function getDado(nivel) {',
-            '    nivel = Number(nivel) || 0;',
-            '    if (nivel >= 51) return "1d100"; if (nivel >= 27) return "1d50";',
-            '    if (nivel >= 26) return "1d20"; if (nivel >= 21) return "1d12";',
-            '    if (nivel >= 16) return "1d10"; if (nivel >= 11) return "1d8";',
-            '    if (nivel >= 6) return "1d6"; return "1d4";',
+            '    var n = Number(nivel) || 0;',
+            '    if (n >= 51) return "1d100"; if (n >= 27) return "1d50";',
+            '    if (n >= 26) return "1d20"; if (n >= 21) return "1d12";',
+            '    if (n >= 16) return "1d10"; if (n >= 11) return "1d8";',
+            '    if (n >= 6) return "1d6"; return "1d4";',
             '  }',
             '  ',
             '  function getD(nivel) {',
-            '    nivel = Number(nivel) || 0;',
-            '    return (nivel >= 51)?100:(nivel >= 27)?50:(nivel >= 26)?20:(nivel >= 21)?12:(nivel >= 16)?10:(nivel >= 11)?8:(nivel >= 6)?6:4;',
+            '    var n = Number(nivel) || 0;',
+            '    return (n >= 51)?100:(n >= 27)?50:(n >= 26)?20:(n >= 21)?12:(n >= 16)?10:(n >= 11)?8:(n >= 6)?6:4;',
             '  }',
             '  ',
-            '  var n1 = Number(this.getField("c2").value) || 0;',
-            '  this.getField("c3").value = getDado(n1);',
-            '  this.getField("res").value = (valBase1 * n1) + getD(n1);',
-            '  this.getField("c8").value = (valBase3 * n1) + getD(n1);',
+            '  var c2Field = this.getField("c2");',
+            '  var n1 = c2Field ? (Number(c2Field.value) || 0) : 0;',
+            '  var c3 = this.getField("c3"); if(c3) c3.value = getDado(n1);',
+            '  var res = this.getField("res"); if(res) res.value = (valBase1 * n1) + getD(n1);',
+            '  var c8 = this.getField("c8"); if(c8) c8.value = (valBase3 * n1) + getD(n1);',
             '  ',
-            '  var n2 = Number(this.getField("c5").value) || 0;',
-            '  this.getField("c6").value = getDado(n2);',
-            '  this.getField("res2").value = (valBase2 * n2) + getD(n2);',
-            '  ',
-            '  for (var i = 9; i <= 35; i += 2) {',
-            '    var nv = this.getField("c" + i).value;',
-            '    this.getField("c" + (i + 1)).value = getDado(nv);',
-            '  }',
-            '}',
-            'calcularFicha.call(this);'
-        ].join('\n');
-
-        const action = pdfDoc.context.obj({
-            Type: 'Action',
-            S: 'JavaScript',
-            JS: PDFString.of(scriptMotor)
-        });
-
-        // GATILHO: No Edge, usamos 'C' (Calculate) em vez de 'K' ou 'V'.
-        // Aplicamos o gatilho nos campos de entrada para que qualquer mudança dispare o cálculo.
-        const triggerNames = ['c1', 'c2', 'c5', 'c9', 'c11', 'c13', 'c15', 'c17', 'c19', 'c21', 'c23', 'c25', 'c27', 'c29', 'c31', 'c33', 'c35'];
-        triggerNames.forEach(name => {
-            try {
-                const field = form.getField(name);
-                // 'C' (Calculate) é o evento mais compatível com navegadores
-                field.acroField.dict.set(PDFName.of('AA'), pdfDoc.context.obj({ C: action }));
-            } catch(e) { console.warn("Erro no gatilho do campo:", name); }
-        });
-
-        const finalPdfBytes = await pdfDoc.save();
-        const blob = new Blob([finalPdfBytes], { type: 'application/pdf' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = "ficha_RPG_edge_ready.pdf";
-        a.click();
-    } catch (err) {
-        console.error(err);
-        alert("Erro técnico: " + err.message);
-    }
-});
