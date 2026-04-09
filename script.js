@@ -1,9 +1,8 @@
-// Adicionamos TextAlignment à desestruturação
 const { PDFDocument, PDFName, PDFString, TextAlignment } = window.PDFLib || {};
 
 let pdfOriginalBytes = null;
 const labels = [
-    "C1 (Lsta Base)", "C2 (Nível 1)", "C3 (Dado 1)", "C4 (Total 1)", 
+    "C1 (Lista Base)", "C2 (Nível 1)", "C3 (Dado 1)", "C4 (Total 1)", 
     "C5 (Nível 2)", "C6 (Dado 2)", "C7 (Total 2)", "C8 (Total 3)",
     "C9 (Nível 3)", "C10 (Dado 3)", "C11 (Nível 4)", "C12 (Dado 4)",
     "C13 (Nível 5)", "C14 (Dado 5)", "C15 (Nível 6)", "C16 (Dado 6)",
@@ -26,7 +25,7 @@ const btnDownload = document.getElementById('btnDownload');
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-// CARREGAMENTO
+// CARREGAMENTO DO PDF
 document.getElementById('uploadPdf').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -52,7 +51,7 @@ document.getElementById('uploadPdf').addEventListener('change', async (e) => {
     }
 });
 
-// CRIAÇÃO DO MARCADOR ARRASTÁVEL
+// MARCADORES NA TELA
 canvas.addEventListener('click', (e) => {
     if (currentStep >= TOTAL_FIELDS || !pdfOriginalBytes) return;
 
@@ -72,7 +71,6 @@ canvas.addEventListener('click', (e) => {
     marker.style.height = defaultH + 'px';
     marker.style.left = (x - defaultW / 2) + 'px';
     marker.style.top = (y - defaultH / 2) + 'px';
-    
     marker.innerHTML = `<span class="label-text">${labels[currentStep]}</span>`;
     wrapper.appendChild(marker);
 
@@ -90,23 +88,20 @@ canvas.addEventListener('click', (e) => {
 function makeDraggable(el) {
     let isDragging = false;
     let offset = { x: 0, y: 0 };
-
     el.addEventListener('mousedown', (e) => {
         if (e.offsetX > el.clientWidth - 15 && e.offsetY > el.clientHeight - 15) return; 
         isDragging = true;
         offset = { x: e.clientX - el.offsetLeft, y: e.clientY - el.offsetTop };
     });
-
     document.addEventListener('mousemove', (e) => {
         if (!isDragging) return;
         el.style.left = (e.clientX - offset.x) + 'px';
         el.style.top = (e.clientY - offset.y) + 'px';
     });
-
     document.addEventListener('mouseup', () => { isDragging = false; });
 }
 
-// GERAÇÃO DO PDF FINAL
+// GERAÇÃO DO PDF
 btnDownload.addEventListener('click', async () => {
     try {
         const pdfDoc = await PDFDocument.load(pdfOriginalBytes.slice(0));
@@ -114,12 +109,10 @@ btnDownload.addEventListener('click', async () => {
         const page = pdfDoc.getPage(0);
         const { width, height } = page.getSize();
         
-        // Movendo arrays estáticos para fora do loop de iteração
         const indicesEsquerda = [36, 37, 40, 41, 42, 43];
         const dadosIndices = [2, 5, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35];
         const opcoesClasses = [' ', 'Tank', 'Hibrido', 'Assassino', 'Destruidor', 'Arcano', 'Mentalista', 'Vitalista', 'Invocador', 'Elementalista'];
         
-        // Cache das dimensões do canvas
         const cWidth = canvas.width;
         const cHeight = canvas.height;
 
@@ -134,6 +127,8 @@ btnDownload.addEventListener('click', async () => {
                 f = form.createDropdown(name);
                 f.addOptions(opcoesClasses);
                 f.select(' ');
+                // OTIMIZAÇÃO: Ativa o "CommitOnSelChange" (Bit 27) para atualizar na hora que clicar
+                f.acroField.setFlags(1 << 26); 
             } else {
                 f = form.createTextField(name);
                 if (i < 36) {
@@ -141,8 +136,6 @@ btnDownload.addEventListener('click', async () => {
                 } else if (i >= 40 && i <= 42) {
                     f.enableMultiline();
                 }
-
-                // Aparência e Fonte
                 f.acroField.dict.set(PDFName.of('DA'), PDFString.of('/Helvetica 12 Tf 0 g'));
                 f.setFontSize(12);
                 f.setAlignment(indicesEsquerda.includes(i) ? TextAlignment.Left : TextAlignment.Center);
@@ -162,43 +155,26 @@ btnDownload.addEventListener('click', async () => {
             });
         }
 
-        // --- SCRIPT DO MOTOR OTIMIZADO ---
+        // MOTOR JS OTIMIZADO (Evento de Cálculo)
         const scriptMotor = [
             'var escolha = this.getField("c1").value;',
-            'var bases = {',
-            '  "Tank": [8,2,2], "Hibrido": [4,2,4], "Assassino": [2,2,8],',
-            '  "Destruidor": [2,4,2], "Arcano": [2,4,2], "Mentalista": [2,4,2],',
-            '  "Vitalista": [2,6,2], "Invocador": [2,6,2], "Elementalista": [2,5,2]',
-            '};',
+            'var bases = { "Tank": [8,2,2], "Hibrido": [4,2,4], "Assassino": [2,2,8], "Destruidor": [2,4,2], "Arcano": [2,4,2], "Mentalista": [2,4,2], "Vitalista": [2,6,2], "Invocador": [2,6,2], "Elementalista": [2,5,2] };',
             'var b = bases[escolha] || [0,0,0];',
-            'var valBase1 = b[0], valBase2 = b[1], valBase3 = b[2];',
-            
-            'function getDado(nivel) {',
-            '  nivel = Number(nivel) || 0;',
-            '  if (nivel >= 51) return "1d100"; if (nivel >= 27) return "1d50";',
-            '  if (nivel >= 26) return "1d20"; if (nivel >= 21) return "1d12";',
-            '  if (nivel >= 16) return "1d10"; if (nivel >= 11) return "1d8";',
-            '  if (nivel >= 6) return "1d6"; return "1d4";',
-            '}',
-            
-            'function getD(nivel) {',
-            '  return (nivel >= 51)?100:(nivel >= 27)?50:(nivel >= 26)?20:(nivel >= 21)?12:(nivel >= 16)?10:(nivel >= 11)?8:(nivel >= 6)?6:4;',
-            '}',
+            'function getDado(n) { n=Number(n)||0; return (n>=51)?"1d100":(n>=27)?"1d50":(n>=26)?"1d20":(n>=21)?"1d12":(n>=16)?"1d10":(n>=11)?"1d8":(n>=6)?"1d6":"1d4"; }',
+            'function getD(n) { n=Number(n)||0; return (n>=51)?100:(n>=27)?50:(n>=26)?20:(n>=21)?12:(n>=16)?10:(n>=11)?8:(n>=6)?6:4; }',
             
             'var n1 = Number(this.getField("c2").value) || 0;',
             'this.getField("c3").value = getDado(n1);',
-            'this.getField("res").value = (valBase1 * n1) + getD(n1);',
-            'this.getField("c8").value = (valBase3 * n1) + getD(n1);',
+            'this.getField("res").value = (b[0] * n1) + getD(n1);',
+            'this.getField("c8").value = (b[2] * n1) + getD(n1);',
             
             'var n2 = Number(this.getField("c5").value) || 0;',
             'this.getField("c6").value = getDado(n2);',
-            'this.getField("res2").value = (valBase2 * n2) + getD(n2);',
+            'this.getField("res2").value = (b[1] * n2) + getD(n2);',
             
-            '// Loop para preencher os dados dos Níveis 3 ao 16 (c9 ao c36)',
             'for (var i = 9; i <= 35; i += 2) {',
-            '  var nivelField = this.getField("c" + i);',
-            '  var dadoField = this.getField("c" + (i + 1));',
-            '  if (nivelField && dadoField) { dadoField.value = getDado(nivelField.value); }',
+            '  var nv = this.getField("c" + i).value;',
+            '  this.getField("c" + (i + 1)).value = getDado(nv);',
             '}'
         ].join('\n');
 
@@ -208,27 +184,26 @@ btnDownload.addEventListener('click', async () => {
             JS: PDFString.of(scriptMotor)
         });
 
-       const triggerNames = ['c1', 'c2', 'c5', 'c9', 'c11', 'c13', 'c15', 'c17', 'c19', 'c21', 'c23', 'c25', 'c27', 'c29', 'c31', 'c33', 'c35'];
+        // OTIMIZAÇÃO FINAL: Usamos a chave 'C' (Calculate) no dicionário 'AA' (Additional Actions).
+        // Isso faz com que o script rode sempre que o valor de QUALQUER campo mude.
+        const triggerNames = ['c1', 'c2', 'c5', 'c9', 'c11', 'c13', 'c15', 'c17', 'c19', 'c21', 'c23', 'c25', 'c27', 'c29', 'c31', 'c33', 'c35'];
         triggerNames.forEach(name => {
             try {
                 const field = form.getField(name);
-                
-                // Adicionamos novos gatilhos para garantir a atualização em tempo real
-                field.acroField.dict.set(PDFName.of('AA'), pdfDoc.context.obj({
-                    V: action,  // Validate: Roda quando o valor é efetivamente alterado
-                    Bl: action, // Blur: Roda imediatamente assim que o campo perde o foco (o usuário clica fora)
-                    C: action   // Calculate: Diz ao motor do PDF para rodar esse script na fila de cálculos globais
+                field.acroField.dict.set(PDFName.of('AA'), pdfDoc.context.obj({ 
+                    C: action // 'C' é o gatilho de Cálculo automático
                 }));
-            } catch(e) { console.warn("Campo não encontrado:", name); }
+            } catch(e) { console.warn(name); }
         });
+
         const finalPdfBytes = await pdfDoc.save();
         const blob = new Blob([finalPdfBytes], { type: 'application/pdf' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = "ficha_centralizada.pdf";
+        a.download = "ficha_automatica.pdf";
         a.click();
     } catch (err) {
         console.error(err);
-        alert("Erro técnico: " + err.message);
+        alert("Erro: " + err.message);
     }
 });
