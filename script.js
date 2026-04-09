@@ -13,8 +13,8 @@ const labels = [
     "C29 (Nível 13)", "C30 (Dado 13)", "C31 (Nível 14)", "C32 (Dado 14)",
     "C33 (Nível 15)", "C34 (Dado 15)", "C35 (Nível 16)", "C36 (Dado 16)",
     "C37 (Texto 1)", "C38 (Texto 2)", "C39 (Texto 3)", "C40 (Texto 4)",
-    "C41 (Texto 5)", // <-- NOVO CAMPO ADICIONADO AQUI
-    "C42 (Multi-linha 1)", "C43 (Multi-linha 2)", "C44 (Multi-linha 3)"
+    "C41 (Multi-linha 1)", "C42 (Multi-linha 2)", "C43 (Multi-linha 3)",
+    "C44 (Texto 5)" // <-- NOVO CAMPO ADICIONADO AQUI
 ];
 
 let currentStep = 0;
@@ -50,7 +50,8 @@ document.getElementById('uploadPdf').addEventListener('change', async (e) => {
 
 // CRIAÇÃO DO MARCADOR ARRASTÁVEL
 canvas.addEventListener('click', (e) => {
-    if (currentStep >= 44 || !pdfOriginalBytes) return; // Limite alterado para 44
+    // Atualizado para 44
+    if (currentStep >= 44 || !pdfOriginalBytes) return;
 
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -60,9 +61,10 @@ canvas.addEventListener('click', (e) => {
     marker.className = 'marker';
     marker.id = `field-${currentStep}`;
     
-    // Tamanho maior apenas para os multi-linhas (agora índices 41, 42 e 43)
-    const defaultW = (currentStep >= 41) ? 120 : 60;
-    const defaultH = (currentStep >= 41) ? 60 : 20;
+    // Ajustado para que apenas os índices 40, 41 e 42 sejam caixas grandes
+    const isMultiLine = (currentStep >= 40 && currentStep <= 42);
+    const defaultW = isMultiLine ? 120 : 60;
+    const defaultH = isMultiLine ? 60 : 20;
 
     marker.style.width = defaultW + 'px';
     marker.style.height = defaultH + 'px';
@@ -75,7 +77,8 @@ canvas.addEventListener('click', (e) => {
     makeDraggable(marker);
 
     currentStep++;
-    if (currentStep === 44) { // Limite alterado para 44
+    // Atualizado para 44
+    if (currentStep === 44) {
         document.getElementById('status').innerText = "Todos os campos posicionados!";
         document.getElementById('btnDownload').disabled = false;
     } else {
@@ -113,7 +116,8 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
         const page = pdfDoc.getPage(0);
         const { width, height } = page.getSize();
 
-        for (let i = 0; i < 44; i++) { // Limite do loop alterado para 44
+        // Atualizado para 44
+        for (let i = 0; i < 44; i++) {
             const el = document.getElementById(`field-${i}`);
             if (!el) continue;
 
@@ -133,7 +137,9 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
                 if (i < 36) {
                     const dadosIndices = [2, 5, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35];
                     f.setText(dadosIndices.includes(i) ? "1d4" : "0");
-                } else if (i >= 41) { // Lógica deslocada para o índice 41 (início dos multi-linhas)
+                } 
+                // Ajustado para garantir que o novo campo (índice 43) seja linha única, como o C37
+                else if (i >= 40 && i <= 42) {
                     f.enableMultiline();
                 }
 
@@ -142,9 +148,8 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
                 f.setFontSize(12);
 
                 // --- NOVA LÓGICA DE ALINHAMENTO ---
-                // Índices deslocados: 36 e 37 continuam esquerda. 
-                // Os multi-linhas agora são 41, 42 e 43.
-                const indicesEsquerda = [36, 37, 41, 42, 43];
+                // Adicionado o índice 43 (C44) na lista de alinhamento à esquerda
+                const indicesEsquerda = [36, 37, 40, 41, 42, 43];
                 if (indicesEsquerda.includes(i)) {
                     f.setAlignment(TextAlignment.Left);
                 } else {
