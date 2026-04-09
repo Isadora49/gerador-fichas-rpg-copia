@@ -3,7 +3,7 @@ const { PDFDocument, PDFName, PDFString, TextAlignment } = window.PDFLib || {};
 
 let pdfOriginalBytes = null;
 const labels = [
-    "C1 (Lista Base)", "C2 (Nível 1)", "C3 (Dado 1)", "C4 (Total 1)", 
+    "C1 (Lsta Base)", "C2 (Nível 1)", "C3 (Dado 1)", "C4 (Total 1)", 
     "C5 (Nível 2)", "C6 (Dado 2)", "C7 (Total 2)", "C8 (Total 3)",
     "C9 (Nível 3)", "C10 (Dado 3)", "C11 (Nível 4)", "C12 (Dado 4)",
     "C13 (Nível 5)", "C14 (Dado 5)", "C15 (Nível 6)", "C16 (Dado 6)",
@@ -26,7 +26,7 @@ const btnDownload = document.getElementById('btnDownload');
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-// CARREGAMENTO
+// CARREGAMENTO DO PDF
 document.getElementById('uploadPdf').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -62,7 +62,7 @@ canvas.addEventListener('click', (e) => {
 
     const marker = document.createElement('div');
     marker.className = 'marker';
-    marker.id = field-${currentStep};
+    marker.id = `field-${currentStep}`;
     
     const isMultiLine = (currentStep >= 40 && currentStep <= 42);
     const defaultW = isMultiLine ? 120 : 60;
@@ -73,7 +73,7 @@ canvas.addEventListener('click', (e) => {
     marker.style.left = (x - defaultW / 2) + 'px';
     marker.style.top = (y - defaultH / 2) + 'px';
     
-    marker.innerHTML = <span class="label-text">${labels[currentStep]}</span>;
+    marker.innerHTML = `<span class="label-text">${labels[currentStep]}</span>`;
     wrapper.appendChild(marker);
 
     makeDraggable(marker);
@@ -122,16 +122,22 @@ btnDownload.addEventListener('click', async () => {
         const cHeight = canvas.height;
 
         for (let i = 0; i < TOTAL_FIELDS; i++) {
-            const el = document.getElementById(field-${i});
+            const el = document.getElementById(`field-${i}`);
             if (!el) continue;
 
-            let name = (i === 3) ? 'res' : (i === 6) ? 'res2' : c${i+1};
+            let name = (i === 3) ? 'res' : (i === 6) ? 'res2' : `c${i+1}`;
             let f;
 
             if (i === 0) {
                 f = form.createDropdown(name);
                 f.addOptions(opcoesClasses);
                 f.select(' ');
+                
+                // --- AJUSTE PARA ATUALIZAÇÃO IMEDIATA ---
+                // Ativa a flag "Commit selection immediately" (Bit 26 do campo Ff)
+                // Isso faz com que o PDF execute o cálculo no momento que o usuário clica na opção
+                f.acroField.dict.set(PDFName.of('Ff'), pdfDoc.context.obj(1 << 26)); 
+                
             } else {
                 f = form.createTextField(name);
                 if (i < 36) {
@@ -140,7 +146,6 @@ btnDownload.addEventListener('click', async () => {
                     f.enableMultiline();
                 }
 
-                // Aparência e Fonte
                 f.acroField.dict.set(PDFName.of('DA'), PDFString.of('/Helvetica 12 Tf 0 g'));
                 f.setFontSize(12);
                 f.setAlignment(indicesEsquerda.includes(i) ? TextAlignment.Left : TextAlignment.Center);
@@ -170,7 +175,7 @@ btnDownload.addEventListener('click', async () => {
             '};',
             'var b = bases[escolha] || [0,0,0];',
             'var valBase1 = b[0], valBase2 = b[1], valBase3 = b[2];',
-            '',
+            
             'function getDado(nivel) {',
             '  nivel = Number(nivel) || 0;',
             '  if (nivel >= 51) return "1d100"; if (nivel >= 36) return "1d50";',
@@ -178,21 +183,20 @@ btnDownload.addEventListener('click', async () => {
             '  if (nivel >= 16) return "1d10"; if (nivel >= 11) return "1d8";',
             '  if (nivel >= 6) return "1d6"; return "1d4";',
             '}',
-            '',
+            
             'function getD(nivel) {',
             '  return (nivel >= 51)?100:(nivel >= 36)?50:(nivel >= 26)?20:(nivel >= 21)?12:(nivel >= 16)?10:(nivel >= 11)?8:(nivel >= 6)?6:4;',
             '}',
-            '',
+            
             'var n1 = Number(this.getField("c2").value) || 0;',
             'this.getField("c3").value = getDado(n1);',
             'this.getField("res").value = (valBase1 * n1) + getD(n1);',
             'this.getField("c8").value = (valBase3 * n1) + getD(n1);',
-            '',
+            
             'var n2 = Number(this.getField("c5").value) || 0;',
             'this.getField("c6").value = getDado(n2);',
             'this.getField("res2").value = (valBase2 * n2) + getD(n2);',
-            '',
-            '// Loop para preencher os dados dos Níveis 3 ao 16 (c9 ao c36)',
+            
             'for (var i = 9; i <= 35; i += 2) {',
             '  var nivelField = this.getField("c" + i);',
             '  var dadoField = this.getField("c" + (i + 1));',
@@ -206,28 +210,16 @@ btnDownload.addEventListener('click', async () => {
             JS: PDFString.of(scriptMotor)
         });
 
-        // ==========================================
-        // MUDANÇA AQUI: Aplicando os padrões PDF p/ Edge e Chrome
-        // ==========================================
-        
-        // 1. Configurando a Ação de Cálculo (C) e a Ordem de Cálculo (CO) no PDF
-        try {
-            const resField = form.getField('res');
-            resField.acroField.dict.set(PDFName.of('AA'), pdfDoc.context.obj({ C: action }));
-            // Adiciona explicitamente o campo 'res' à Ordem de Cálculo do documento
-            form.acroForm.dict.set(PDFName.of('CO'), pdfDoc.context.obj([ resField.ref ]));
-        } catch (e) {
-            console.warn("Aviso na ordem de cálculo:", e);
-        }
-
-        // 2. Fallbacks de Gatilho de usuário: substituindo Keystroke (K) por Blur (Bl)
+        // Trigger em todos os campos de entrada (c1, níveis, etc)
         const triggerNames = ['c1', 'c2', 'c5', 'c9', 'c11', 'c13', 'c15', 'c17', 'c19', 'c21', 'c23', 'c25', 'c27', 'c29', 'c31', 'c33', 'c35'];
         triggerNames.forEach(name => {
             try {
                 const field = form.getField(name);
-                // Bl = Blur (perda de foco)
-                // V = Validate (quando o dado é confirmado)
-                field.acroField.dict.set(PDFName.of('AA'), pdfDoc.context.obj({ Bl: action, V: action }));
+                // Usamos 'K' (Keystroke) e 'V' (Validate) para garantir que o script rode ao mudar o valor
+                field.acroField.dict.set(PDFName.of('AA'), pdfDoc.context.obj({ 
+                    K: action, 
+                    V: action 
+                }));
             } catch(e) { console.warn("Campo não encontrado:", name); }
         });
 
