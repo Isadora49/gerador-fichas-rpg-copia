@@ -196,7 +196,7 @@ document.getElementById('btnDownload').addEventListener('click', async () => {
             '  if (nivel <= 35) return "1d20"; if (nivel <= 25) return "1d12";',
             '  if (nivel <= 20) return "1d10"; if (nivel <= 15) return "1d8";',
             '  if (nivel <= 10) return "1d6";',
-            ' if (nivel <= 5) return "1d4";',
+            '  if (nivel <= 5) return "1d4";',
             '}',
             'var n1 = Number(this.getField("c2").value) || 0;',
             'this.getField("c3").value = getDado(n1);',
