@@ -208,14 +208,19 @@ btnDownload.addEventListener('click', async () => {
             JS: PDFString.of(scriptMotor)
         });
 
-        const triggerNames = ['c1', 'c2', 'c5', 'c9', 'c11', 'c13', 'c15', 'c17', 'c19', 'c21', 'c23', 'c25', 'c27', 'c29', 'c31', 'c33', 'c35'];
+       const triggerNames = ['c1', 'c2', 'c5', 'c9', 'c11', 'c13', 'c15', 'c17', 'c19', 'c21', 'c23', 'c25', 'c27', 'c29', 'c31', 'c33', 'c35'];
         triggerNames.forEach(name => {
             try {
                 const field = form.getField(name);
-                field.acroField.dict.set(PDFName.of('AA'), pdfDoc.context.obj({ K: action, V: action }));
+                
+                // Adicionamos novos gatilhos para garantir a atualização em tempo real
+                field.acroField.dict.set(PDFName.of('AA'), pdfDoc.context.obj({
+                    V: action,  // Validate: Roda quando o valor é efetivamente alterado
+                    Bl: action, // Blur: Roda imediatamente assim que o campo perde o foco (o usuário clica fora)
+                    C: action   // Calculate: Diz ao motor do PDF para rodar esse script na fila de cálculos globais
+                }));
             } catch(e) { console.warn("Campo não encontrado:", name); }
         });
-
         const finalPdfBytes = await pdfDoc.save();
         const blob = new Blob([finalPdfBytes], { type: 'application/pdf' });
         const a = document.createElement('a');
